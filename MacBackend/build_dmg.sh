@@ -262,8 +262,9 @@ ln -s /Applications "$STAGING_DIR/Applications"
 # ── Installer note for the DMG window ─────────────────────────────────────
 cat > "$STAGING_DIR/Install iCodex-Connect.txt" << 'INSTALLNOTE'
 1. Drag iCodex-Connect.app into Applications.
-2. Open iCodex-Connect from Applications.
+2. Open iCodex-Connect from Applications, or open it here and choose "Install and Open".
 3. When macOS opens Accessibility settings, add iCodex-Connect and toggle it ON.
+4. The installer volume should eject automatically after the app relaunches.
 INSTALLNOTE
 
 # ── Standalone app bundle for local testing ───────────────────────────────

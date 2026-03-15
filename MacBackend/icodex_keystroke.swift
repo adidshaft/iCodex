@@ -35,25 +35,145 @@ func isInstalledInApplications(_ appURL: URL) -> Bool {
     return normalizedPath.hasPrefix(systemApplications) || normalizedPath.hasPrefix(userApplications)
 }
 
+func preferredInstallURL(for appURL: URL) -> URL {
+    let fileManager = FileManager.default
+    let appName = appURL.lastPathComponent
+    let systemApplications = URL(fileURLWithPath: "/Applications", isDirectory: true)
+    if fileManager.isWritableFile(atPath: systemApplications.path) {
+        return systemApplications.appendingPathComponent(appName, isDirectory: true)
+    }
+
+    let userApplications = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+        .appendingPathComponent("Applications", isDirectory: true)
+    try? fileManager.createDirectory(at: userApplications, withIntermediateDirectories: true)
+    return userApplications.appendingPathComponent(appName, isDirectory: true)
+}
+
+func appVolumeURL(for appURL: URL) -> URL? {
+    try? appURL.resourceValues(forKeys: [.volumeURLKey]).volume
+}
+
+func installerVolumes(appNamed appName: String, excluding currentAppURL: URL? = nil) -> [URL] {
+    let fileManager = FileManager.default
+    let mounted = fileManager.mountedVolumeURLs(
+        includingResourceValuesForKeys: [.volumeURLKey],
+        options: []
+    ) ?? []
+
+    return mounted.filter { volumeURL in
+        if let currentAppURL,
+           let currentVolume = appVolumeURL(for: currentAppURL),
+           currentVolume.resolvingSymlinksInPath() == volumeURL.resolvingSymlinksInPath() {
+            return false
+        }
+
+        let bundledApp = volumeURL.appendingPathComponent("\(appName).app", isDirectory: true)
+        let installNote = volumeURL.appendingPathComponent("Install \(appName).txt")
+        let applicationsAlias = volumeURL.appendingPathComponent("Applications")
+        return fileManager.fileExists(atPath: bundledApp.path)
+            && fileManager.fileExists(atPath: installNote.path)
+            && fileManager.fileExists(atPath: applicationsAlias.path)
+    }
+}
+
+@discardableResult
+func ejectVolume(_ volumeURL: URL) -> Bool {
+    func detach(arguments: [String]) -> Bool {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
+        task.arguments = arguments
+        do {
+            try task.run()
+            task.waitUntilExit()
+            return task.terminationStatus == 0
+        } catch {
+            return false
+        }
+    }
+
+    return detach(arguments: ["detach", volumeURL.path, "-quiet"])
+        || detach(arguments: ["detach", volumeURL.path, "-force", "-quiet"])
+}
+
+func shellQuoted(_ string: String) -> String {
+    "'" + string.replacingOccurrences(of: "'", with: "'\"'\"'") + "'"
+}
+
+func scheduleEjectVolume(_ volumeURL: URL, after delaySeconds: Int = 2) {
+    let task = Process()
+    task.executableURL = URL(fileURLWithPath: "/bin/sh")
+    let quotedPath = shellQuoted(volumeURL.path)
+    task.arguments = [
+        "-c",
+        "sleep \(delaySeconds); /usr/bin/hdiutil detach \(quotedPath) -quiet || /usr/bin/hdiutil detach \(quotedPath) -force -quiet"
+    ]
+    try? task.run()
+}
+
+func cleanupMountedInstallerVolumes(appNamed appName: String, excluding currentAppURL: URL? = nil) {
+    for volumeURL in installerVolumes(appNamed: appName, excluding: currentAppURL) {
+        _ = ejectVolume(volumeURL)
+    }
+}
+
+func relaunchInstalledApp(at installedAppURL: URL) {
+    let task = Process()
+    task.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+    task.arguments = [installedAppURL.path]
+    try? task.run()
+}
+
+func installAppBundle(from sourceAppURL: URL, to destinationAppURL: URL) throws {
+    let fileManager = FileManager.default
+    if fileManager.fileExists(atPath: destinationAppURL.path) {
+        try fileManager.removeItem(at: destinationAppURL)
+    }
+    try fileManager.copyItem(at: sourceAppURL, to: destinationAppURL)
+}
+
 func promptToInstallInApplications(appURL: URL) -> Never {
     let app = NSApplication.shared
     app.setActivationPolicy(.regular)
     app.activate(ignoringOtherApps: true)
 
+    let destinationURL = preferredInstallURL(for: appURL)
     let alert = NSAlert()
     alert.alertStyle = .warning
-    alert.messageText = "Move iCodex-Connect to Applications"
+    alert.messageText = "Install iCodex-Connect to Applications"
     alert.informativeText = """
-    Before first launch, drag iCodex-Connect.app into Applications and open it from there.
+    iCodex-Connect works best when launched from Applications.
 
     Running it from the DMG or another folder can prevent Accessibility permission from sticking correctly.
+    Install location:
+    \(destinationURL.path)
     """
+    alert.addButton(withTitle: "Install and Open")
     alert.addButton(withTitle: "Show Me")
     alert.addButton(withTitle: "Quit")
 
-    if alert.runModal() == .alertFirstButtonReturn {
+    let response = alert.runModal()
+    if response == .alertFirstButtonReturn {
+        do {
+            try installAppBundle(from: appURL, to: destinationURL)
+            relaunchInstalledApp(at: destinationURL)
+            if let sourceVolume = appVolumeURL(for: appURL) {
+                scheduleEjectVolume(sourceVolume)
+            }
+        } catch {
+            let failure = NSAlert()
+            failure.alertStyle = .critical
+            failure.messageText = "Could Not Install iCodex-Connect"
+            failure.informativeText = """
+            \(error.localizedDescription)
+
+            Try dragging the app into Applications manually, then open it from there.
+            """
+            failure.addButton(withTitle: "OK")
+            failure.runModal()
+        }
+    } else if response == .alertSecondButtonReturn {
         NSWorkspace.shared.activateFileViewerSelecting([appURL])
-        NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications", isDirectory: true))
+        NSWorkspace.shared.open(destinationURL.deletingLastPathComponent())
     }
 
     exit(0)
@@ -451,9 +571,11 @@ func launchBackend() {
     // by macOS. Spawn the bash launcher script to set up Python + start server.
     let execPath = CommandLine.arguments[0]
     let appURL = bundleURL(for: execPath)
+    let appName = appURL.deletingPathExtension().lastPathComponent
     if !isInstalledInApplications(appURL) {
         promptToInstallInApplications(appURL: appURL)
     }
+    cleanupMountedInstallerVolumes(appNamed: appName, excluding: appURL)
 
     let macosDir = (execPath as NSString).deletingLastPathComponent
     let launcher = (macosDir as NSString).appendingPathComponent("icodex_launcher_impl")
