@@ -1,0 +1,10 @@
+setuptools>=75.0
+fastapi>=0.115
+uvicorn[standard]>=0.34
+websockets>=14.0
+rumps>=0.4.0
+pyobjc-framework-Cocoa>=10.3
+httpx>=0.28
+pydantic>=2.10
+python-dotenv>=1.0
+watchdog>=4.0
