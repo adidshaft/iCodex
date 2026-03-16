@@ -26,6 +26,7 @@ from pathlib import Path
 logger = logging.getLogger("icodex.gui")
 
 CODEX_BUNDLE_ID = "com.openai.codex"
+CODEX_APP_NAME = "Codex"
 THREAD_OPEN_TIMEOUT_SECONDS = 8.0
 THREAD_FOCUS_SETTLE_SECONDS = 0.7
 THREAD_FOCUS_CACHE_SECONDS = 5.0
@@ -187,15 +188,37 @@ def get_session_state() -> dict:
 
 
 def is_gui_running() -> bool:
-    """Return True if the Codex desktop app is running."""
+    """Return True if the Codex desktop app is running.
+
+    ``pgrep -f com.openai.codex`` is unreliable because the bundle id does not
+    appear in the live process command line on every machine. Prefer the
+    bundle-id check that macOS itself understands, then fall back to process
+    name/path matching.
+    """
     try:
         r = subprocess.run(
-            ["pgrep", "-f", CODEX_BUNDLE_ID],
-            capture_output=True, timeout=3,
+            ["osascript", "-e", f'application id "{CODEX_BUNDLE_ID}" is running'],
+            capture_output=True,
+            text=True,
+            timeout=3,
         )
-        return r.returncode == 0
+        if r.returncode == 0 and r.stdout.strip().lower() == "true":
+            return True
     except Exception:
-        return False
+        pass
+
+    for cmd in (
+        ["pgrep", "-x", CODEX_APP_NAME],
+        ["pgrep", "-f", "/Applications/Codex.app/Contents/MacOS/Codex"],
+    ):
+        try:
+            r = subprocess.run(cmd, capture_output=True, timeout=3)
+            if r.returncode == 0:
+                return True
+        except Exception:
+            continue
+
+    return False
 
 
 def check_accessibility() -> dict:

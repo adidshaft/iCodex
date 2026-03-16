@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import atexit
 import json
 import os
 import signal
@@ -19,6 +20,7 @@ BACKEND_DIR = Path(__file__).resolve().parent
 AUTH_FILE = Path.home() / ".codex" / "icodex_auth.json"
 DATA_DIR = Path.home() / "Library" / "Application Support" / "iCodex-Connect"
 LOG_DIR = DATA_DIR / "logs"
+VOLUMES_DIR = Path("/Volumes")
 
 # ── Python discovery chain ────────────────────────────────────────────────────
 # 1. app-support venv  2. venv in current dir  3. running interpreter
@@ -34,6 +36,17 @@ for _p in _VENV_CANDIDATES:
     if _p.is_file():
         PYTHON = str(_p)
         break
+
+
+def _app_bundle_dir() -> Path | None:
+    for parent in BACKEND_DIR.parents:
+        if parent.suffix == ".app":
+            return parent
+    return None
+
+
+APP_BUNDLE_DIR = _app_bundle_dir()
+APP_NAME = APP_BUNDLE_DIR.stem if APP_BUNDLE_DIR else "iCodex-Connect"
 
 
 # ── Auto-setup helpers ────────────────────────────────────────────────────────
@@ -161,6 +174,107 @@ def _server_post(path: str) -> bool:
         return False
 
 
+def _is_installed_in_applications(app_dir: Path | None) -> bool:
+    if app_dir is None:
+        return False
+    try:
+        normalized = app_dir.resolve()
+        system_applications = Path("/Applications").resolve()
+        user_applications = (Path.home() / "Applications").resolve()
+        normalized_path = normalized.as_posix() + "/"
+        return (
+            normalized_path.startswith(system_applications.as_posix() + "/")
+            or normalized_path.startswith(user_applications.as_posix() + "/")
+        )
+    except Exception:
+        return False
+
+
+def _volume_root_for_path(path: Path | None) -> Path | None:
+    if path is None:
+        return None
+    try:
+        normalized = path.resolve()
+    except Exception:
+        normalized = path
+    parts = normalized.parts
+    if len(parts) >= 3 and parts[1] == "Volumes":
+        return Path("/", parts[1], parts[2])
+    return None
+
+
+def _installer_volumes(app_name: str, excluding_app_dir: Path | None = None) -> list[Path]:
+    current_volume = _volume_root_for_path(excluding_app_dir)
+    if not VOLUMES_DIR.exists():
+        return []
+
+    volumes: list[Path] = []
+    for volume in VOLUMES_DIR.iterdir():
+        try:
+            if current_volume and volume.resolve() == current_volume.resolve():
+                continue
+        except Exception:
+            pass
+
+        bundled_app = volume / f"{app_name}.app"
+        install_note = volume / f"Install {app_name}.txt"
+        applications_alias = volume / "Applications"
+        name_matches = volume.name == app_name or volume.name.startswith(f"{app_name} ")
+        looks_like_installer = (
+            bundled_app.exists()
+            and (
+                name_matches
+                or install_note.exists()
+                or applications_alias.exists()
+            )
+        )
+        if looks_like_installer:
+            volumes.append(volume)
+    return volumes
+
+
+def _eject_volume(volume: Path) -> bool:
+    for args in (
+        ["/usr/bin/hdiutil", "detach", volume.as_posix(), "-quiet"],
+        ["/usr/bin/hdiutil", "detach", volume.as_posix(), "-force", "-quiet"],
+    ):
+        try:
+            result = subprocess.run(
+                args,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode == 0:
+                return True
+        except Exception:
+            continue
+    return False
+
+
+def _schedule_eject_volume(volume: Path, delay_seconds: int = 2) -> None:
+    quoted = volume.as_posix().replace("'", "'\"'\"'")
+    script = (
+        f"sleep {delay_seconds}; "
+        f"/usr/bin/hdiutil detach '{quoted}' -quiet || "
+        f"/usr/bin/hdiutil detach '{quoted}' -force -quiet"
+    )
+    try:
+        subprocess.Popen(
+            ["/bin/sh", "-c", script],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    except Exception:
+        pass
+
+
+def _cleanup_installer_volumes(app_name: str, excluding_app_dir: Path | None = None) -> None:
+    for volume in _installer_volumes(app_name, excluding_app_dir=excluding_app_dir):
+        _eject_volume(volume)
+
+
 # ── Accessibility permission ──────────────────────────────────────────────────
 
 
@@ -240,6 +354,7 @@ class ICodexMenuBarApp(rumps.App):
 
         self._server_proc: subprocess.Popen | None = None
         self._devices: list[dict] = []
+        self._shutdown_handled = False
 
         # ── Menu items ────────────────────────────────────────────────────
         self.status_item = rumps.MenuItem("Server: Starting…")
@@ -293,6 +408,11 @@ class ICodexMenuBarApp(rumps.App):
         self._startup_a11y_guidance_timer: rumps.Timer | None = None
         self._show_startup_a11y_guidance = os.environ.get("ICODEX_SHOW_A11Y_GUIDANCE") == "1"
 
+        # If we're running from Applications, clean up stale installer volumes
+        # left behind by previous DMG opens.
+        if _is_installed_in_applications(APP_BUNDLE_DIR):
+            _cleanup_installer_volumes(APP_NAME, excluding_app_dir=APP_BUNDLE_DIR)
+
         # ── Auto-start server ─────────────────────────────────────────────
         if not _is_port_in_use(PORT):
             self._start_server()
@@ -305,6 +425,13 @@ class ICodexMenuBarApp(rumps.App):
         if self._show_startup_a11y_guidance:
             self._startup_a11y_guidance_timer = rumps.Timer(self._show_a11y_guidance_once, 1)
             self._startup_a11y_guidance_timer.start()
+
+        atexit.register(self._perform_shutdown_cleanup)
+        for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+            try:
+                signal.signal(sig, self._handle_termination_signal)
+            except Exception:
+                pass
 
     # ── Refresh loop ──────────────────────────────────────────────────────
 
@@ -474,6 +601,21 @@ class ICodexMenuBarApp(rumps.App):
         # Also kill anything still holding the port
         _free_port(PORT)
 
+    def _perform_shutdown_cleanup(self):
+        if self._shutdown_handled:
+            return
+        self._shutdown_handled = True
+        self._stop_server()
+        _cleanup_installer_volumes(APP_NAME, excluding_app_dir=APP_BUNDLE_DIR)
+        if not _is_installed_in_applications(APP_BUNDLE_DIR):
+            current_volume = _volume_root_for_path(APP_BUNDLE_DIR)
+            if current_volume is not None:
+                _schedule_eject_volume(current_volume)
+
+    def _handle_termination_signal(self, _signum, _frame):
+        self._perform_shutdown_cleanup()
+        raise SystemExit(0)
+
     # ── Menu callbacks ────────────────────────────────────────────────────
 
     def on_start_stop(self, _sender):
@@ -526,7 +668,7 @@ class ICodexMenuBarApp(rumps.App):
         self._refresh(None)
 
     def on_quit(self, _sender):
-        self._stop_server()
+        self._perform_shutdown_cleanup()
         rumps.quit_application()
 
 

@@ -266,6 +266,19 @@ final class ThreadDetailViewModel: ObservableObject {
             return
         }
 
+        // Avoid refocusing the Mac thread while we're actively sending text or
+        // pressing a GUI action from iPhone.
+        guard !isSending, !isSendingGUIAction else {
+            return
+        }
+
+        guard isRunning else {
+            if !mirroredControls.isEmpty {
+                mirroredControls = []
+            }
+            return
+        }
+
         do {
             let response = try await APIService.shared.fetchGUIControls(threadId)
             let controls = (response.controls ?? []).filter { !$0.title.isEmpty }
