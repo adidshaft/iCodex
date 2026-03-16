@@ -4,3 +4,4 @@ dist/
 public/downloads/
 unused/*
 !unused/.gitkeep
+.vercel
