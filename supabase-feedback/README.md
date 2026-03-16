@@ -5,11 +5,11 @@ while still allowing deployment to the same Supabase project.
 
 ## What lives here
 
-- `functions/icodex-feedback/index.ts`
+- `supabase/functions/icodex-feedback/index.ts`
   Browser-safe edge function that accepts support, feedback, and feature requests.
-- `migrations/20260316000100_create_icodex_feedback_submissions.sql`
+- `supabase/migrations/20260316000100_create_icodex_feedback_submissions.sql`
   Table and policy for storing feedback submissions.
-- `config.toml`
+- `supabase/config.toml`
   Minimal local Supabase function config for this iCodex-specific deployment unit.
 
 ## Deploy to the shared Supabase project

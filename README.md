@@ -5,7 +5,7 @@ A two-part system for managing the Codex CLI remotely: a **macOS Menu Bar backen
 ## Project Structure
 
 ```
-CodexManagerSystem/
+iCodex/
 ├── MacBackend/
 │   ├── venv/                  Python virtual environment (pre-installed)
 │   ├── config.py              Env-based configuration
@@ -37,7 +37,7 @@ CodexManagerSystem/
 ### Option A: Menu Bar App
 
 ```bash
-cd CodexManagerSystem/MacBackend
+cd MacBackend
 source venv/bin/activate
 python menubar_app.py
 ```
@@ -51,7 +51,7 @@ A brain icon (🧠) appears in your menu bar with these options:
 ### Option B: Run the Server Directly
 
 ```bash
-cd CodexManagerSystem/MacBackend
+cd MacBackend
 source venv/bin/activate
 python server.py
 ```
@@ -119,7 +119,7 @@ curl -X POST http://localhost:8642/tasks \
 If the virtual environment is missing or broken:
 
 ```bash
-cd CodexManagerSystem/MacBackend
+cd MacBackend
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt

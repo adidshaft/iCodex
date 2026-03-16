@@ -1,4 +1,4 @@
-project_id = "default"
+project_id = "vwxoqjrmmwyyzggmqgdh"
 
 [functions.icodex-feedback]
 verify_jwt = false

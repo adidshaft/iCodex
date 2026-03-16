@@ -20,3 +20,5 @@ iCodex/iCodex.xcodeproj/xcuserdata/
 iCodex/iCodex.xcodeproj/project.xcworkspace/xcuserdata/
 *.xcuserstate
 DerivedData/
+unused/legacy-root-files/
+supabase-feedback/supabase/.temp/

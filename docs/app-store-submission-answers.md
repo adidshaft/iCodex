@@ -101,8 +101,8 @@ Recommended pages to publish:
 - `https://your-domain.com/download-mac`
 
 You can use the repo drafts in:
-- `CodexManagerSystem/docs/privacy-policy.md`
-- `CodexManagerSystem/docs/support.md`
+- `docs/privacy-policy.md`
+- `docs/support.md`
 
 ## App Review guideline framing
 

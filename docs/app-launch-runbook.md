@@ -9,11 +9,11 @@ Goal:
 ## Current repo state
 
 What the codebase currently does:
-- The iOS app is a SwiftUI client in `CodexManagerSystem/iCodex`.
+- The iOS app is a SwiftUI client in `iCodex`.
 - The iOS app discovers a Mac on the same Wi-Fi by scanning local subnets and then talks to the Mac backend over `http://<ip>:8642`.
 - Pairing is done with a 6-digit setup passcode shown by the Mac app.
-- The Mac companion is packaged by `CodexManagerSystem/MacBackend/build_dmg.sh`.
-- The Mac companion controls the Codex desktop app and requests Accessibility permission through the native helper in `CodexManagerSystem/MacBackend/icodex_keystroke.swift`.
+- The Mac companion is packaged by `MacBackend/build_dmg.sh`.
+- The Mac companion controls the Codex desktop app and requests Accessibility permission through the native helper in `MacBackend/icodex_keystroke.swift`.
 
 Release-relevant settings already present:
 - iOS bundle ID: `adidshaft.iCodex`
