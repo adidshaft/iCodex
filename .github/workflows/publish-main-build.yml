@@ -1,0 +1,84 @@
+name: Publish Main Build
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release-mac-downloads:
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build macOS app and DMG
+        working-directory: MacBackend
+        run: bash build_dmg.sh
+
+      - name: Prepare stable release assets
+        working-directory: MacBackend
+        run: |
+          set -euo pipefail
+
+          APP_NAME="iCodex-Connect"
+          BUILD_DIR="build"
+          RELEASE_DIR="release"
+
+          mkdir -p "$RELEASE_DIR"
+
+          DMG_PATH="$(find "$BUILD_DIR" -maxdepth 1 -name "${APP_NAME}-*.dmg" | head -n 1)"
+          if [ -z "$DMG_PATH" ]; then
+            echo "Could not find DMG output." >&2
+            exit 1
+          fi
+
+          if [ ! -d "$BUILD_DIR/${APP_NAME}.app" ]; then
+            echo "Could not find app bundle output." >&2
+            exit 1
+          fi
+
+          cp "$DMG_PATH" "$RELEASE_DIR/${APP_NAME}.dmg"
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$BUILD_DIR/${APP_NAME}.app" \
+            "$RELEASE_DIR/${APP_NAME}.app.zip"
+
+          shasum -a 256 \
+            "$RELEASE_DIR/${APP_NAME}.dmg" \
+            "$RELEASE_DIR/${APP_NAME}.app.zip" \
+            > "$RELEASE_DIR/SHA256SUMS.txt"
+
+      - name: Move rolling release tag to this commit
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f main-build "${GITHUB_SHA}"
+          git push origin refs/tags/main-build --force
+
+      - name: Publish rolling release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: main-build
+          name: Main Build
+          allowUpdates: true
+          removeArtifacts: true
+          replacesArtifacts: true
+          prerelease: true
+          artifacts: |
+            MacBackend/release/iCodex-Connect.dmg
+            MacBackend/release/iCodex-Connect.app.zip
+            MacBackend/release/SHA256SUMS.txt
+          body: |
+            Automated rolling build from `${{ github.sha }}` on `main`.
+
+            Stable asset URLs:
+            - `https://github.com/${{ github.repository }}/releases/download/main-build/iCodex-Connect.dmg`
+            - `https://github.com/${{ github.repository }}/releases/download/main-build/iCodex-Connect.app.zip`

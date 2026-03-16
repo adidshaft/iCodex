@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+    <meta
+      name="description"
+      content="Support and setup instructions for iCodex and iCodex-Connect."
+    />
+    <title>iCodex Support</title>
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="site-header">
+        <a class="brandmark" href="/" aria-label="iCodex home">
+          <img src="/assets/icodex-logo.png" alt="iCodex logo" />
+          <div>
+            <span class="brandmark-name">iCodex</span>
+            <span class="brandmark-sub">remote Codex cockpit</span>
+          </div>
+        </a>
+
+        <nav class="header-nav" aria-label="Primary navigation">
+          <a href="/#steps">How it works</a>
+          <a href="/#downloads">Downloads</a>
+          <a href="/privacy/">Privacy</a>
+          <a href="/support/">Support</a>
+        </nav>
+      </header>
+
+      <main class="doc-page">
+        <section class="doc-hero">
+          <p class="eyebrow">Support</p>
+          <h1 class="doc-title">Install, pair, and recover fast.</h1>
+          <p class="doc-lead">
+            Updated: 2026-03-16. These setup and troubleshooting notes come
+            from the current iCodex support docs in the repo.
+          </p>
+        </section>
+
+        <section class="doc-grid doc-grid-two">
+          <article class="doc-card">
+            <h2>Setup</h2>
+            <ol class="doc-list doc-ordered">
+              <li>Download <span>iCodex-Connect</span> for macOS from the official website.</li>
+              <li>Move the app to <span>/Applications</span> and open it from there.</li>
+              <li>Grant Accessibility permission on your Mac when prompted.</li>
+              <li>Open the Codex desktop app on your Mac.</li>
+              <li>Make sure your Mac and iPhone or iPad are on the same Wi-Fi network.</li>
+              <li>Pair using the 6-digit passcode shown by the Mac menu bar app.</li>
+            </ol>
+          </article>
+
+          <article class="doc-card">
+            <h2>Quick links</h2>
+            <div class="doc-link-stack">
+              <a class="download-item" data-link="dmg" href="#">
+                <div>
+                  <strong>Download iCodex-Connect.dmg</strong>
+                  <span>Main Mac installer.</span>
+                </div>
+                <em>macOS</em>
+              </a>
+              <a class="download-item" data-link="appZip" href="#">
+                <div>
+                  <strong>Download iCodex-Connect.app.zip</strong>
+                  <span>Direct app bundle zip.</span>
+                </div>
+                <em>zip</em>
+              </a>
+              <a class="download-item" href="/privacy/">
+                <div>
+                  <strong>Read the privacy policy</strong>
+                  <span>How local network access and device storage work.</span>
+                </div>
+                <em>policy</em>
+              </a>
+            </div>
+          </article>
+        </section>
+
+        <section class="doc-section" id="feedback-form">
+          <h2>Feedback and suggestions</h2>
+          <div class="doc-grid doc-grid-two">
+            <article class="doc-card doc-form-card">
+              <p class="doc-form-lead">
+                Send support questions, product feedback, or feature ideas
+                straight into the shared Supabase project.
+              </p>
+
+              <form class="feedback-form" data-feedback-form>
+                <label>
+                  <span>What is this about?</span>
+                  <select name="category" required>
+                    <option value="feedback">General feedback</option>
+                    <option value="feature">Feature suggestion</option>
+                    <option value="support">Support issue</option>
+                  </select>
+                </label>
+
+                <label>
+                  <span>Name</span>
+                  <input
+                    type="text"
+                    name="name"
+                    maxlength="120"
+                    placeholder="Optional"
+                  />
+                </label>
+
+                <label>
+                  <span>Email</span>
+                  <input
+                    type="email"
+                    name="email"
+                    maxlength="160"
+                    placeholder="Optional, if you want a reply"
+                  />
+                </label>
+
+                <label>
+                  <span>Message</span>
+                  <textarea
+                    name="message"
+                    rows="7"
+                    minlength="8"
+                    maxlength="3000"
+                    required
+                    placeholder="What should change? What broke? What feature do you want?"
+                  ></textarea>
+                </label>
+
+                <input type="hidden" name="pageContext" value="support-page" />
+
+                <div class="feedback-form-actions">
+                  <button class="button button-primary" type="submit">
+                    Send
+                  </button>
+                  <p class="form-status" data-feedback-status aria-live="polite"></p>
+                </div>
+              </form>
+            </article>
+
+            <article class="doc-card">
+              <h3>What to send</h3>
+              <ul class="doc-list">
+                <li>anything confusing in setup or pairing</li>
+                <li>features you want on iPhone or Mac</li>
+                <li>bugs in thread loading, control actions, or search</li>
+                <li>rough edges in install, permissions, and reconnect behavior</li>
+              </ul>
+
+              <h3>Good examples</h3>
+              <ul class="doc-list">
+                <li><span>Feature:</span> “Let me favorite threads from the phone.”</li>
+                <li><span>Support:</span> “Pairing succeeds but stop action does nothing.”</li>
+                <li><span>Feedback:</span> “The current overview card is hard to scan outdoors.”</li>
+              </ul>
+            </article>
+          </div>
+        </section>
+
+        <section class="doc-section">
+          <h2>Troubleshooting</h2>
+          <div class="doc-grid doc-grid-two">
+            <article class="doc-card">
+              <h3>My Mac is not found</h3>
+              <ul class="doc-list">
+                <li>Make sure <span>iCodex-Connect</span> is running.</li>
+                <li>Confirm both devices are on the same Wi-Fi network.</li>
+                <li>Confirm Local Network access is enabled for iCodex in iOS Settings.</li>
+                <li>If needed, enter your Mac’s local IP address manually.</li>
+              </ul>
+            </article>
+
+            <article class="doc-card">
+              <h3>Pairing does not work</h3>
+              <ul class="doc-list">
+                <li>Use the current 6-digit passcode from the Mac menu bar app.</li>
+                <li>Try disconnecting and pairing again from the iOS app settings.</li>
+              </ul>
+            </article>
+
+            <article class="doc-card">
+              <h3>Remote control actions fail</h3>
+              <ul class="doc-list">
+                <li>Verify that <span>iCodex-Connect</span> still has Accessibility permission.</li>
+                <li>Verify that the Codex desktop app is open and responsive.</li>
+              </ul>
+            </article>
+
+            <article class="doc-card">
+              <h3>The Mac app will not launch cleanly</h3>
+              <ul class="doc-list">
+                <li>Open it from <span>/Applications</span>, not from the mounted DMG.</li>
+                <li>Reinstall the latest signed and notarized version from the official website.</li>
+              </ul>
+            </article>
+          </div>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <div class="footer-links">
+          <a href="/">Home</a>
+          <a href="/privacy/">Privacy</a>
+        </div>
+        <p>
+          iCodex support docs. Mac companion version
+          <span data-build-version></span>.
+        </p>
+      </footer>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
