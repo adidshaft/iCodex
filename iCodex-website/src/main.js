@@ -2,8 +2,9 @@ import "./styles.css";
 
 const appLinks = {
   ios: "https://apps.apple.com/us/search?term=iCodex",
-  dmg: "/downloads/iCodex-Connect-2.1.0.dmg",
-  appZip: "/downloads/iCodex-Connect.app.zip",
+  dmg: "https://github.com/adidshaft/iCodex/releases/download/main-build/iCodex-Connect.dmg",
+  appZip:
+    "https://github.com/adidshaft/iCodex/releases/download/main-build/iCodex-Connect.app.zip",
 };
 
 const supabaseConfig = {

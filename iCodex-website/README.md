@@ -28,7 +28,7 @@ Edit `/Users/amanpandey/Desktop/iCodex/iCodex-website/src/main.js`:
 - `appLinks.dmg` for the DMG download
 - `appLinks.appZip` for the direct Mac app zip
 
-Current downloads already point at the local files in `public/downloads/`.
+Current downloads point at the rolling GitHub release assets under `main-build`.
 
 ## Routes
 
