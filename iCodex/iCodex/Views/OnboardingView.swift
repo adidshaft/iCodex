@@ -44,55 +44,103 @@ struct OnboardingView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                Spacer(minLength: 40)
+        ZStack {
+            // Deep dark gradient background
+            LinearGradient(
+                colors: [
+                    Color(red: 0.05, green: 0.05, blue: 0.12),
+                    Color(red: 0.08, green: 0.10, blue: 0.20),
+                    Color(red: 0.04, green: 0.06, blue: 0.16)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
 
-                // Logo
-                VStack(spacing: 12) {
-                    Image(systemName: "brain.head.profile")
-                        .font(.system(size: 56))
-                        .foregroundStyle(.blue)
-                    Text("iCodex")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                    Text("Remote pilot for Codex")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.bottom, 40)
+            ScrollView {
+                VStack(spacing: 0) {
+                    // Hero/Logo
+                    heroSection
+                        .padding(.top, 56)
+                        .padding(.bottom, 40)
 
-                // Step content
-                Group {
-                    switch step {
-                    case .prerequisites:
-                        prerequisitesView
-                    case .scanning:
-                        scanningView
-                    case .noServerFound:
-                        noServerView
-                    case .serverFound:
-                        serverFoundView
-                    case .authenticate:
-                        authenticateView
-                    case .done:
-                        EmptyView()
+                    // Step content card
+                    Group {
+                        switch step {
+                        case .prerequisites:
+                            prerequisitesView
+                        case .scanning:
+                            scanningView
+                        case .noServerFound:
+                            noServerView
+                        case .serverFound:
+                            serverFoundView
+                        case .authenticate:
+                            authenticateView
+                        case .done:
+                            EmptyView()
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    ))
+                    .animation(.spring(response: 0.45, dampingFraction: 0.82), value: step)
+
+                    Spacer(minLength: 16)
+
+                    // Manual config link
+                    if step != .done && step != .authenticate && step != .scanning {
+                        Button("Enter IP Manually") {
+                            cancelScan()
+                            withAnimation { step = .authenticate }
+                        }
+                        .font(.caption)
+                        .foregroundStyle(Color.white.opacity(0.35))
+                        .padding(.vertical, 20)
                     }
                 }
-                .padding(.horizontal, 32)
+            }
+        }
+    }
 
-                Spacer(minLength: 20)
+    // MARK: - Hero Section
 
-                // Manual config link
-                if step != .done && step != .authenticate {
-                    Button("Enter IP Manually") {
-                        cancelScan()
-                        step = .authenticate
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.bottom, 24)
-                }
+    private var heroSection: some View {
+        VStack(spacing: 18) {
+            ZStack {
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [Color.white.opacity(0.07), Color.clear],
+                            center: .center,
+                            startRadius: 30,
+                            endRadius: 80
+                        )
+                    )
+                    .frame(width: 160, height: 160)
+
+                Image("AppLogo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 96, height: 96)
+                    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    .shadow(color: Color.black.opacity(0.5), radius: 20, x: 0, y: 8)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                    )
+            }
+
+            VStack(spacing: 6) {
+                Text("iCodex")
+                    .font(.system(size: 34, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+
+                Text("Remote pilot for Codex")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.white.opacity(0.45))
             }
         }
     }
@@ -100,180 +148,276 @@ struct OnboardingView: View {
     // MARK: - Prerequisites
 
     private var prerequisitesView: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "checklist")
-                .font(.system(size: 36))
-                .foregroundStyle(.blue)
+        VStack(spacing: 0) {
+            // Section header
+            HStack {
+                Image(systemName: "checklist")
+                    .foregroundStyle(Color(red: 0.30, green: 0.78, blue: 0.94))
+                    .font(.system(size: 15, weight: .semibold))
+                Text("Before You Start")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 16)
 
-            Text("Before You Start")
-                .font(.headline)
-
-            Text("Make sure you've completed these steps on your Mac:")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-
-            VStack(alignment: .leading, spacing: 14) {
+            // Card
+            VStack(spacing: 0) {
                 prerequisiteRow(
                     number: "1",
                     icon: "desktopcomputer",
                     title: "Install iCodex-Connect",
-                    detail: "Open the DMG and drag iCodex-Connect to Applications on your Mac"
+                    detail: "Open the DMG and drag iCodex-Connect to Applications"
                 )
+                Divider().background(Color.white.opacity(0.08))
                 prerequisiteRow(
                     number: "2",
                     icon: "hand.raised.fill",
                     title: "Grant Accessibility Permission",
-                    detail: "iCodex-Connect will prompt you on first launch — click 'Open Settings' and add it"
+                    detail: "On first launch click 'Open Settings' and add it"
                 )
+                Divider().background(Color.white.opacity(0.08))
                 prerequisiteRow(
                     number: "3",
                     icon: "app.badge.checkmark",
                     title: "Open the Codex App",
-                    detail: "The Codex desktop app must be running for remote control"
+                    detail: "The Codex desktop app must be running"
                 )
+                Divider().background(Color.white.opacity(0.08))
                 prerequisiteRow(
                     number: "4",
                     icon: "wifi",
                     title: "Same WiFi Network",
-                    detail: "Your iPhone and Mac must be on the same local network. iOS will also ask for Local Network access the first time you connect."
+                    detail: "iPhone and Mac must be on the same local network"
                 )
             }
-            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color.white.opacity(0.07))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(Color.white.opacity(0.10), lineWidth: 1)
+                    )
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
 
+            // CTA
             Button {
-                step = .scanning
+                withAnimation { step = .scanning }
                 startScan()
             } label: {
-                Text("Continue")
-                    .fontWeight(.semibold)
-                    .frame(maxWidth: .infinity)
+                HStack(spacing: 8) {
+                    Text("Find My Server")
+                        .fontWeight(.semibold)
+                    Image(systemName: "arrow.right")
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color(red: 0.22, green: 0.47, blue: 0.96))
+                )
+                .foregroundStyle(.white)
             }
-            .buttonStyle(.borderedProminent)
-            .padding(.top, 8)
+            .buttonStyle(.plain)
+            .padding(.top, 20)
         }
     }
 
     private func prerequisiteRow(number: String, icon: String, title: String, detail: String) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 18))
-                .foregroundStyle(.blue)
-                .frame(width: 24)
+        HStack(alignment: .top, spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(Color(red: 0.22, green: 0.47, blue: 0.96).opacity(0.18))
+                    .frame(width: 36, height: 36)
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Color(red: 0.30, green: 0.78, blue: 0.94))
+            }
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(.subheadline)
-                    .fontWeight(.medium)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.white)
                 Text(detail)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.white.opacity(0.45))
                     .fixedSize(horizontal: false, vertical: true)
             }
+            Spacer(minLength: 0)
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
     }
 
     // MARK: - Scanning
 
     private var scanningView: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-                .scaleEffect(1.2)
-            Text("Searching for iCodex server on your network...")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-            if let subnet = detectedSubnet {
-                Text("Scanning \(subnet).x ...")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+        VStack(spacing: 28) {
+            ZStack {
+                Circle()
+                    .stroke(Color.white.opacity(0.08), lineWidth: 2)
+                    .frame(width: 80, height: 80)
+                Circle()
+                    .stroke(Color(red: 0.22, green: 0.47, blue: 0.96).opacity(0.5), lineWidth: 2)
+                    .frame(width: 60, height: 60)
+                ProgressView()
+                    .scaleEffect(1.3)
+                    .tint(Color(red: 0.30, green: 0.78, blue: 0.94))
             }
-            Text("\(Int(scanProgress * 100))%")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-                .monospacedDigit()
+
+            VStack(spacing: 10) {
+                Text("Searching for iCodex")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                if let subnet = detectedSubnet {
+                    Text("Scanning \(subnet).x")
+                        .font(.caption)
+                        .foregroundStyle(Color.white.opacity(0.4))
+                        .monospacedDigit()
+                }
+                Text("\(Int(scanProgress * 100))%")
+                    .font(.system(size: 13, design: .monospaced))
+                    .foregroundStyle(Color(red: 0.30, green: 0.78, blue: 0.94))
+                    .monospacedDigit()
+            }
         }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.white.opacity(0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                )
+        )
     }
 
     // MARK: - No Server
 
     private var noServerView: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 24) {
             Image(systemName: "wifi.exclamationmark")
-                .font(.system(size: 36))
-                .foregroundStyle(.orange)
+                .font(.system(size: 42))
+                .foregroundStyle(Color.orange)
+                .padding(.bottom, 4)
 
-            Text("No iCodex server found")
-                .font(.headline)
+            VStack(spacing: 6) {
+                Text("Server Not Found")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                Text("Make sure iCodex-Connect is running on your Mac and both are on the same WiFi.")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.white.opacity(0.5))
+                    .multilineTextAlignment(.center)
+            }
 
-            VStack(alignment: .leading, spacing: 8) {
-                Label("Make sure iCodex-Connect is running on your Mac", systemImage: "desktopcomputer")
-                Label("Both devices must be on the same WiFi", systemImage: "wifi")
-                if let wifiIP = WiFiHelper.getWiFiIPAddress() {
-                    Label("Your iPhone IP: \(wifiIP)", systemImage: "iphone")
-                } else {
-                    Label("iPhone doesn't appear to be on WiFi", systemImage: "wifi.slash")
-                        .foregroundStyle(.red)
+            if let wifiIP = WiFiHelper.getWiFiIPAddress() {
+                HStack(spacing: 8) {
+                    Image(systemName: "iphone")
+                        .font(.caption)
+                    Text("iPhone: \(wifiIP)")
+                        .font(.caption)
+                        .monospacedDigit()
                 }
+                .foregroundStyle(Color.white.opacity(0.35))
             }
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
 
-            Button {
-                step = .scanning
-                startScan()
-            } label: {
-                Label("Scan Again", systemImage: "arrow.clockwise")
+            VStack(spacing: 12) {
+                Button {
+                    withAnimation { step = .scanning }
+                    startScan()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.clockwise")
+                        Text("Scan Again")
+                            .fontWeight(.semibold)
+                    }
                     .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .padding(.top, 8)
+                    .padding(.vertical, 14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color(red: 0.22, green: 0.47, blue: 0.96))
+                    )
+                    .foregroundStyle(.white)
+                }
+                .buttonStyle(.plain)
 
-            Button {
-                step = .authenticate
-            } label: {
-                Text("Enter IP Manually")
-                    .frame(maxWidth: .infinity)
+                Button {
+                    withAnimation { step = .authenticate }
+                } label: {
+                    Text("Enter IP Manually")
+                        .fontWeight(.medium)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(Color.white.opacity(0.08))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                                )
+                        )
+                        .foregroundStyle(.white)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.bordered)
-            .padding(.top, 4)
         }
+        .padding(.vertical, 8)
     }
 
     // MARK: - Server Found
 
     private var serverFoundView: some View {
         VStack(spacing: 20) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 36))
-                .foregroundStyle(.green)
-
-            Text("Server found!")
-                .font(.headline)
+            VStack(spacing: 8) {
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.system(size: 42))
+                    .foregroundStyle(.green)
+                Text("Server Found!")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+            }
 
             ForEach(discoveredServers) { server in
                 Button {
                     config.host = server.ip
                     manualIP = server.ip
-                    step = .authenticate
+                    withAnimation { step = .authenticate }
                 } label: {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 14) {
+                        ZStack {
+                            Circle()
+                                .fill(Color.green.opacity(0.15))
+                                .frame(width: 42, height: 42)
+                            Image(systemName: "desktopcomputer")
+                                .font(.system(size: 18))
+                                .foregroundStyle(.green)
+                        }
+                        VStack(alignment: .leading, spacing: 3) {
                             Text(server.ip)
-                                .font(.body)
-                                .fontWeight(.medium)
-                            Text("v\(server.version) - \(server.threads) threads")
+                                .font(.system(size: 15, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(.white)
+                            Text("v\(server.version) · \(server.threads) threads")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.white.opacity(0.45))
                         }
                         Spacer()
-                        Image(systemName: "arrow.right.circle.fill")
-                            .font(.title3)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Color.white.opacity(0.3))
                     }
-                    .padding(14)
+                    .padding(16)
                     .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(.secondarySystemBackground))
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color.white.opacity(0.07))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .stroke(Color.green.opacity(0.2), lineWidth: 1)
+                            )
                     )
                 }
                 .buttonStyle(.plain)
@@ -282,7 +426,7 @@ struct OnboardingView: View {
             if discoveredServers.count > 1 {
                 Text("Tap a server to connect")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.white.opacity(0.35))
             }
         }
     }
@@ -290,110 +434,161 @@ struct OnboardingView: View {
     // MARK: - Authenticate
 
     private var authenticateView: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "lock.shield")
-                .font(.system(size: 36))
-                .foregroundStyle(.blue)
-
-            Text("Connect to Server")
-                .font(.headline)
-
-            Text("Enter your Mac's IP and the 6-digit passcode from the iCodex-Connect menu bar.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-
-            // Server IP field
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Server IP Address")
+        VStack(spacing: 20) {
+            // Header
+            VStack(spacing: 8) {
+                Image(systemName: "lock.shield.fill")
+                    .font(.system(size: 38))
+                    .foregroundStyle(Color(red: 0.30, green: 0.78, blue: 0.94))
+                Text("Connect to Server")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                Text("Enter your Mac's IP and the 6-digit passcode from the iCodex-Connect menu bar.")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
-                TextField("e.g. 192.168.1.42", text: $manualIP)
-                    .keyboardType(.decimalPad)
-                    .autocorrectionDisabled()
-                    .textInputAutocapitalization(.never)
-                    .font(.system(size: 18, weight: .medium, design: .monospaced))
+                    .foregroundStyle(Color.white.opacity(0.45))
                     .multilineTextAlignment(.center)
-                    .padding(.vertical, 10)
-                    .padding(.horizontal, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color(.tertiarySystemBackground))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color(.systemGray4), lineWidth: 1)
-                    )
-                    .onAppear {
-                        // Pre-fill with whatever was found or configured
-                        if manualIP.isEmpty {
-                            manualIP = config.host
-                        }
-                    }
-                    .onChange(of: manualIP) { _, newValue in
-                        config.host = newValue
-                    }
+            }
 
-                if let wifiIP = WiFiHelper.getWiFiIPAddress() {
-                    Text("Your iPhone is on: \(wifiIP)")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
+            // Fields card
+            VStack(spacing: 16) {
+                // Server IP
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("SERVER IP ADDRESS")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.4))
+                        .tracking(1)
+                    TextField("e.g. 192.168.1.42", text: $manualIP)
+                        .keyboardType(.decimalPad)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                        .font(.system(size: 16, weight: .medium, design: .monospaced))
+                        .multilineTextAlignment(.center)
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(Color.white.opacity(0.08))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                        )
+                        .foregroundStyle(.white)
+                        .tint(Color(red: 0.30, green: 0.78, blue: 0.94))
+                        .onAppear {
+                            if manualIP.isEmpty { manualIP = config.host }
+                        }
+                        .onChange(of: manualIP) { _, newValue in
+                            config.host = newValue
+                        }
+                    if let wifiIP = WiFiHelper.getWiFiIPAddress() {
+                        Text("Your iPhone: \(wifiIP)")
+                            .font(.caption2)
+                            .foregroundStyle(Color.white.opacity(0.3))
+                            .monospacedDigit()
+                    }
+                }
+
+                // Passcode
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("SETUP PASSCODE")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.4))
+                        .tracking(1)
+                    TextField("000000", text: $passcodeInput)
+                        .keyboardType(.numberPad)
+                        .font(.system(size: 30, weight: .bold, design: .monospaced))
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(Color.white.opacity(0.08))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(
+                                    passcodeInput.count == 6
+                                        ? Color(red: 0.30, green: 0.78, blue: 0.94).opacity(0.5)
+                                        : Color.white.opacity(0.12),
+                                    lineWidth: 1
+                                )
+                        )
+                        .foregroundStyle(.white)
+                        .tint(Color(red: 0.30, green: 0.78, blue: 0.94))
+                        .onChange(of: passcodeInput) { _, newValue in
+                            let sanitized = String(newValue.filter(\.isNumber).prefix(6))
+                            if sanitized != newValue { passcodeInput = sanitized }
+                        }
+                }
+            }
+            .padding(20)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color.white.opacity(0.05))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                    )
+            )
+
+            // Status
+            if isAuthenticating {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .tint(Color(red: 0.30, green: 0.78, blue: 0.94))
+                    Text("Connecting...")
+                        .font(.caption)
+                        .foregroundStyle(Color.white.opacity(0.5))
                 }
             }
 
-            // Passcode field
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Setup Passcode")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                TextField("000000", text: $passcodeInput)
-                    .keyboardType(.numberPad)
-                    .font(.system(size: 32, weight: .bold, design: .monospaced))
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 200)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .padding(.horizontal, 16)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(.tertiarySystemBackground))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color(.systemGray4), lineWidth: 1)
-                    )
-                    .onChange(of: passcodeInput) { _, newValue in
-                        let sanitized = String(newValue.filter(\.isNumber).prefix(6))
-                        if sanitized != newValue {
-                            passcodeInput = sanitized
-                        }
-                    }
-            }
-
-            if isAuthenticating {
-                ProgressView("Connecting...")
-            }
-
             if let error = authError {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.red)
                     Text(error)
                         .font(.caption)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Color.red.opacity(0.85))
                 }
+                .padding(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.red.opacity(0.08))
+                )
                 .fixedSize(horizontal: false, vertical: true)
             }
 
+            // Connect button
             Button {
                 authenticate()
             } label: {
-                Text("Connect")
-                    .fontWeight(.semibold)
-                    .frame(maxWidth: .infinity)
+                HStack(spacing: 8) {
+                    if isAuthenticating {
+                        ProgressView()
+                            .tint(.white)
+                            .scaleEffect(0.85)
+                    } else {
+                        Image(systemName: "bolt.fill")
+                        Text("Connect")
+                            .fontWeight(.semibold)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(
+                            passcodeInput.count == 6 && !manualIP.isEmpty && !isAuthenticating
+                                ? Color(red: 0.22, green: 0.47, blue: 0.96)
+                                : Color.white.opacity(0.1)
+                        )
+                )
+                .foregroundStyle(.white)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.plain)
             .disabled(passcodeInput.count != 6 || manualIP.isEmpty || isAuthenticating)
+            .animation(.easeInOut(duration: 0.2), value: passcodeInput.count)
         }
     }
 

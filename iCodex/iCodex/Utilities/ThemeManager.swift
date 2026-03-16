@@ -24,6 +24,7 @@ enum AppTheme: String, CaseIterable, Identifiable, Sendable {
     case standard
     case midnight
     case terminal
+    case obsidian
 
     var id: String { rawValue }
 
@@ -32,6 +33,7 @@ enum AppTheme: String, CaseIterable, Identifiable, Sendable {
         case .standard: return "Default"
         case .midnight: return "Midnight"
         case .terminal: return "Terminal"
+        case .obsidian: return "Obsidian"
         }
     }
 
@@ -40,6 +42,7 @@ enum AppTheme: String, CaseIterable, Identifiable, Sendable {
         case .standard: return "Clean adaptive light & dark"
         case .midnight: return "Deep navy with cyan accents"
         case .terminal: return "Hacker green-on-black"
+        case .obsidian: return "Rich violet & indigo dark"
         }
     }
 
@@ -48,6 +51,7 @@ enum AppTheme: String, CaseIterable, Identifiable, Sendable {
         case .standard: return Self.standardColors
         case .midnight: return Self.midnightColors
         case .terminal: return Self.terminalColors
+        case .obsidian: return Self.obsidianColors
         }
     }
 
@@ -103,6 +107,24 @@ enum AppTheme: String, CaseIterable, Identifiable, Sendable {
         headerBackground: Color(red: 0.06, green: 0.07, blue: 0.05),
         inputBackground: Color(red: 0.08, green: 0.10, blue: 0.08),
         divider: Color(red: 0.12, green: 0.22, blue: 0.12)
+    )
+
+    // MARK: - Obsidian Theme
+
+    private static let obsidianColors = ThemeColors(
+        background: Color(red: 0.06, green: 0.05, blue: 0.12),
+        surface: Color(red: 0.10, green: 0.08, blue: 0.18),
+        bubbleUser: Color(red: 0.40, green: 0.20, blue: 0.80).opacity(0.30),
+        bubbleAssistant: Color(red: 0.11, green: 0.09, blue: 0.20),
+        textPrimary: Color(red: 0.92, green: 0.90, blue: 0.98),
+        textSecondary: Color(red: 0.56, green: 0.52, blue: 0.72),
+        accent: Color(red: 0.68, green: 0.46, blue: 0.98),
+        codeBackground: Color(red: 0.07, green: 0.06, blue: 0.14),
+        codeText: Color(red: 0.80, green: 0.72, blue: 0.98),
+        codeBorder: Color(red: 0.22, green: 0.18, blue: 0.36),
+        headerBackground: Color(red: 0.08, green: 0.07, blue: 0.16),
+        inputBackground: Color(red: 0.12, green: 0.10, blue: 0.22),
+        divider: Color(red: 0.20, green: 0.16, blue: 0.34)
     )
 }
 

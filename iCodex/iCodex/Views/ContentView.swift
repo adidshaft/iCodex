@@ -9,12 +9,12 @@ struct ContentView: View {
             TabView {
                 DashboardView()
                     .tabItem {
-                        Label("Threads", systemImage: "list.bullet")
+                        Label("Threads", systemImage: "bubble.left.and.bubble.right.fill")
                     }
 
                 ModelsView()
                     .tabItem {
-                        Label("Models", systemImage: "cpu")
+                        Label("Models", systemImage: "cpu.fill")
                     }
 
                 SettingsView()

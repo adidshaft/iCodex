@@ -302,14 +302,22 @@ struct SettingsView: View {
                 Section("Appearance") {
                     ForEach(AppTheme.allCases) { theme in
                         Button {
-                            withAnimation(.easeInOut(duration: 0.3)) {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                                 themeManager.selectedTheme = theme
                             }
                         } label: {
-                            HStack(spacing: 12) {
-                                // Theme preview swatch
+                            HStack(spacing: 14) {
                                 ThemePreviewSwatch(theme: theme.colors)
-                                    .frame(width: 50, height: 36)
+                                    .frame(width: 54, height: 38)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .stroke(
+                                                themeManager.selectedTheme == theme
+                                                    ? theme.colors.accent
+                                                    : Color.clear,
+                                                lineWidth: 2
+                                            )
+                                    )
 
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(theme.displayName)
@@ -325,7 +333,8 @@ struct SettingsView: View {
 
                                 if themeManager.selectedTheme == theme {
                                     Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(.blue)
+                                        .foregroundStyle(theme.colors.accent)
+                                        .transition(.scale.combined(with: .opacity))
                                 }
                             }
                             .padding(.vertical, 4)
@@ -333,25 +342,43 @@ struct SettingsView: View {
                     }
                 }
 
-                Section("About") {
+                Section {
+                    // App identity banner
+                    HStack(spacing: 14) {
+                        Image("AppLogo")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 52, height: 52)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("iCodex")
+                                .font(.headline)
+                                .fontWeight(.bold)
+                            Text("Remote pilot for Codex")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(appVersionText)
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundStyle(.tertiary)
+                                .padding(.top, 1)
+                        }
+                    }
+                    .padding(.vertical, 6)
+
                     HStack {
                         Text("API Endpoint")
                         Spacer()
                         Text(config.baseURL)
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                    }
-                    HStack {
-                        Text("Version")
-                        Spacer()
-                        Text(appVersionText)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
                     HStack {
                         Text("Connection")
                         Spacer()
-                        Text("Local network to your Mac")
+                        Text("Local WiFi")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -365,6 +392,8 @@ struct SettingsView: View {
                     } label: {
                         Label("Support Guide", systemImage: "questionmark.circle")
                     }
+                } header: {
+                    Text("About")
                 }
             }
             .navigationTitle("Settings")
