@@ -1,444 +1,115 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0"
-    />
-    <meta
-      name="description"
-      content="iCodex lets you drive Codex from your phone while your Mac companion keeps the session alive."
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Control your Codex sessions from your iPhone. Same Mac, same threads." />
     <title>iCodex</title>
   </head>
   <body>
-    <div class="page-shell">
-      <header class="site-header">
-        <a class="brandmark" href="#top" aria-label="iCodex home">
-          <img src="/assets/icodex-logo.png" alt="iCodex logo" />
-          <div>
-            <span class="brandmark-name">iCodex</span>
-            <span class="brandmark-sub">remote Codex cockpit</span>
-          </div>
+
+    <!-- HEADER -->
+    <header class="header blur-glass" id="header">
+      <div class="header-inner container">
+        <a class="wordmark" href="/">
+          <img src="/assets/icodex-logo.png" alt="" width="24" height="24" />
+          <span>iCodex</span>
         </a>
+        <div class="header-right">
+          <a class="nav-link" href="https://github.com/adidshaft/iCodex" target="_blank" rel="noreferrer">GitHub</a>
+          <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+            <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+            </svg>
+            <svg class="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </header>
 
-        <nav class="header-nav" aria-label="Primary navigation">
-          <a href="#steps">How it works</a>
-          <a href="#downloads">Downloads</a>
-          <a href="/privacy/">Privacy</a>
-          <a href="/support/">Support</a>
-        </nav>
-      </header>
-
-      <main id="top">
-        <section class="hero reveal is-visible">
-          <div class="hero-copy">
-            <p class="eyebrow">
-              Live threads. Live tokens. Same Mac.
-            </p>
-            <h1>
-              Use Codex
-              <span>while you move</span>
-            </h1>
-            <p class="hero-lead">
-              iCodex turns your iPhone into a remote dashboard for Codex,
-              while the Mac companion stays in your menu bar and keeps
-              everything running.
-            </p>
-
-            <div class="hero-actions">
-              <a
-                class="button button-primary"
-                data-link="ios"
-                href="#"
-                target="_blank"
-                rel="noreferrer"
-              >
-                App Store
-              </a>
-              <a
-                class="button button-secondary"
-                data-link="dmg"
-                href="#"
-              >
-                macOS DMG
-              </a>
-              <a
-                class="button button-ghost"
-                data-link="appZip"
-                href="#"
-              >
-                Mac App Zip
-              </a>
-              <a
-                class="button button-feedback"
-                href="/support/#feedback-form"
-              >
-                Give feedback
-              </a>
-            </div>
-
-            <div class="hero-facts">
-              <article>
-                <span>Mac companion</span>
-                <strong>v<span data-build-version></span></strong>
-              </article>
-              <article>
-                <span>Minimum macOS</span>
-                <strong><span data-min-macos></span></strong>
-              </article>
-              <article>
-                <span>Pairing</span>
-                <strong>Same Wi-Fi</strong>
-              </article>
-            </div>
-
-            <p class="hero-footnote">
-              Your Mac stays put. Your context does not.
-            </p>
-          </div>
-
-          <div class="hero-visual">
-            <div class="hero-word-stack" aria-hidden="true">
-              <span>move</span>
-              <span>move</span>
-              <span>move</span>
-            </div>
-            <img
-              class="hero-pepe"
-              src="/assets/pepe-toilet-alt.webp"
-              alt=""
-              aria-hidden="true"
-            />
-
-            <div class="hero-stage">
-              <div class="schematic schematic-left" aria-hidden="true">
-                <span class="node"></span>
-                <span class="trace trace-angle"></span>
-                <span class="trace trace-line"></span>
-                <span class="glyph">&gt;_</span>
-              </div>
-
-              <div class="phone-frame">
-                <div class="phone-inner">
-                  <div class="phone-status">
-                    <span>11:42</span>
-                    <div class="phone-island"></div>
-                    <div class="phone-icons">
-                      <span class="dot"></span>
-                      <span class="bar"></span>
-                    </div>
-                  </div>
-
-                  <div class="phone-appbar">
-                    <div class="phone-user">
-                      <div class="user-badge">IC</div>
-                      <div>
-                        <p>iCodex</p>
-                        <span>threads on the move</span>
-                      </div>
-                    </div>
-                    <div class="speed-pill">FAST</div>
-                  </div>
-
-                  <div class="phone-search">
-                    <span class="search-icon">⌕</span>
-                    <span>Search threads...</span>
-                  </div>
-
-                  <p class="phone-section-label">Overview</p>
-
-                  <div class="phone-summary">
-                    <div class="summary-row running">
-                      <span>Running</span>
-                      <strong>2</strong>
-                    </div>
-                    <div class="summary-row">
-                      <span>Threads</span>
-                      <strong>18</strong>
-                    </div>
-                    <div class="summary-row">
-                      <span>Total Tokens</span>
-                      <strong>1048.0M</strong>
-                    </div>
-                  </div>
-
-                  <div class="thread-group">
-                    <div class="group-heading">
-                      <div class="group-label">
-                        <span class="caret">⌄</span>
-                        <span class="folder">iCodex</span>
-                        <span class="presence"></span>
-                      </div>
-                      <span class="group-count">2</span>
-                    </div>
-
-                    <div class="thread-card-list">
-                      <article class="thread-card active">
-                        <div>
-                          <p>Plan App Store launch steps</p>
-                          <span>2 sec ago</span>
-                        </div>
-                        <div class="thread-side">
-                          <span class="run-tag">RUNNING</span>
-                          <span>295.2K</span>
-                        </div>
-                      </article>
-
-                      <article class="thread-card">
-                        <div>
-                          <p>Fix iCodex connect prompts</p>
-                          <span>14 sec ago</span>
-                        </div>
-                        <div class="thread-side">
-                          <span class="run-tag">RUNNING</span>
-                          <span>18.6M</span>
-                        </div>
-                      </article>
-                    </div>
-                  </div>
-
-                  <div class="thread-group compact">
-                    <div class="group-heading">
-                      <div class="group-label">
-                        <span class="caret">⌄</span>
-                        <span class="folder">rdr</span>
-                      </div>
-                      <span class="group-count">2</span>
-                    </div>
-
-                    <article class="thread-card">
-                      <div>
-                        <p>Wait for more details</p>
-                        <span>main · 7 min ago</span>
-                      </div>
-                      <div class="thread-side">
-                        <span class="code-mark">&lt;/&gt;</span>
-                        <span>143.9K</span>
-                      </div>
-                    </article>
-                  </div>
-
-                  <div class="phone-nav">
-                    <div class="nav-item active">
-                      <span class="nav-icon threads"></span>
-                      <span>Threads</span>
-                    </div>
-                    <div class="nav-item">
-                      <span class="nav-icon models"></span>
-                      <span>Models</span>
-                    </div>
-                    <div class="nav-item">
-                      <span class="nav-icon settings"></span>
-                      <span>Settings</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <aside class="floating-panel">
-                <p class="floating-label">Mac bridge live</p>
-                <div class="floating-row">
-                  <span>Status</span>
-                  <strong>menu bar online</strong>
-                </div>
-                <div class="floating-row">
-                  <span>Permission</span>
-                  <strong>Accessibility on</strong>
-                </div>
-                <div class="floating-row">
-                  <span>Network</span>
-                  <strong>same local Wi-Fi</strong>
-                </div>
-              </aside>
-            </div>
-          </div>
-        </section>
-
-        <section class="section feature-band reveal">
-          <article class="feature-card">
-            <p class="feature-kicker">Start fast</p>
-            <h2>Kick off a task before you sit back down.</h2>
-            <p>
-              Fire prompts from your phone and let the Mac companion
-              drive the Codex session for you.
-            </p>
-          </article>
-
-          <article class="feature-card">
-            <p class="feature-kicker">See the pulse</p>
-            <h2>Watch thread counts, status, and token burn live.</h2>
-            <p>
-              The dashboard keeps the important signals loud enough to
-              scan at a glance.
-            </p>
-          </article>
-
-          <article class="feature-card">
-            <p class="feature-kicker">Cut the noise</p>
-            <h2>Stop stale runs and jump straight into the right thread.</h2>
-            <p>
-              Search, skim, and intervene without hovering over your desk.
-            </p>
-          </article>
-        </section>
-
-        <section class="section feedback-cta reveal">
-          <div class="feedback-cta-copy">
-            <p class="eyebrow">Help shape it</p>
-            <h2>Tell us what feels clunky, missing, or surprisingly useful.</h2>
-            <p>
-              The site should keep asking for feedback because the product is
-              still young. If you want a feature, faster pairing, cleaner
-              thread views, or better Mac install flow, send it.
-            </p>
-          </div>
-
-          <div class="feedback-cta-actions">
-            <a class="button button-primary" href="/support/#feedback-form">
-              Send feedback
+    <!-- MAIN -->
+    <main class="main single-view">
+      <div class="container split-layout">
+        
+        <!-- LEFT COLUMN: Hero & Steps -->
+        <div class="split-left reveal">
+          <h1 class="hero-title">Your Codex,<br>Everywhere you go.</h1>
+          <p class="hero-subtitle">
+            The companion app to control your Mac's Codex sessions remotely. Same threads, same power — right from your iPhone.
+          </p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" data-link="ios" href="#">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+              <span>Download for iOS</span>
             </a>
-            <a class="button button-secondary" href="/support/#feedback-form">
-              Suggest a feature
-            </a>
+            <div class="dropdown">
+              <button class="btn btn-secondary dropdown-toggle" aria-haspopup="true" aria-expanded="false">
+                <span>Mac Connector ▾</span>
+              </button>
+              <div class="dropdown-menu">
+                <a class="dropdown-item" data-link="dmg" href="#">Download .dmg (Installer)</a>
+                <a class="dropdown-item" data-link="appZip" href="#">Download .app.zip (Direct)</a>
+              </div>
+            </div>
           </div>
-        </section>
 
-        <section class="section steps-section reveal" id="steps">
-          <div class="section-heading">
-            <p class="eyebrow">How to use it</p>
-            <h2>Three concise steps and you are moving.</h2>
+          <!-- STEPS/FEATURES (Compact Version) -->
+          <div class="steps-compact mt-auto">
+            <div class="step-item">
+              <span class="step-num">01</span>
+              <div>
+                <h3>Install Connector</h3>
+                <p>Run iCodex-Connect on your Mac.</p>
+              </div>
+            </div>
+            <div class="step-item">
+              <span class="step-num">02</span>
+              <div>
+                <h3>Grant Permissions</h3>
+                <p>Approve Accessibility logic.</p>
+              </div>
+            </div>
+            <div class="step-item">
+              <span class="step-num">03</span>
+              <div>
+                <h3>Pair Device</h3>
+                <p>Connect over local Wi-Fi.</p>
+              </div>
+            </div>
           </div>
+        </div>
 
-          <div class="steps-grid">
-            <article class="step-card">
-              <span class="step-number">01</span>
-              <h3>Install the Mac companion</h3>
-              <p>
-                Drop <span>iCodex-Connect</span> into Applications, open it,
-                and approve Accessibility when macOS asks.
-              </p>
-            </article>
-
-            <article class="step-card">
-              <span class="step-number">02</span>
-              <h3>Pair your phone on the same Wi-Fi</h3>
-              <p>
-                Open iCodex on iPhone, enter the pairing details from your
-                Mac, and confirm the bridge is live.
-              </p>
-            </article>
-
-            <article class="step-card">
-              <span class="step-number">03</span>
-              <h3>Run, monitor, and interrupt threads remotely</h3>
-              <p>
-                Start tasks, track token growth, search threads, and stop
-                anything that is drifting.
-              </p>
-            </article>
+        <!-- RIGHT COLUMN: Visual -->
+        <div class="split-right reveal">
+          <div class="phone-mockup">
+            <div class="phone-frame shadow-large">
+              <div class="phone-screen">
+                <img src="/assets/app-screenshot.png" alt="iCodex App Screenshot" />
+              </div>
+            </div>
+            <img class="pepe-float" src="/assets/pepe-huge.png" alt="Pepe" />
           </div>
-        </section>
+        </div>
 
-        <section class="section detail-grid reveal">
-          <article class="terminal-panel">
-            <div class="panel-header">
-              <span class="panel-dot green"></span>
-              <span class="panel-dot blue"></span>
-              <span class="panel-dot steel"></span>
-              <p>why iCodex feels different</p>
-            </div>
+      </div>
+    </main>
 
-            <div class="terminal-lines">
-              <div>
-                <span class="prompt">&gt;_</span>
-                <p>Remote-first UI that still feels like a terminal tool.</p>
-              </div>
-              <div>
-                <span class="prompt">&gt;_</span>
-                <p>Menu bar Mac bridge keeps the heavy lifting off your phone.</p>
-              </div>
-              <div>
-                <span class="prompt">&gt;_</span>
-                <p>Same network, same machine, same Codex context.</p>
-              </div>
-              <div>
-                <span class="prompt">&gt;_</span>
-                <p>Designed to scan in motion, not only when sitting still.</p>
-              </div>
-            </div>
-          </article>
-
-          <aside class="download-panel" id="downloads">
-            <p class="eyebrow">Downloads</p>
-            <h2>Everything you need to ship the setup.</h2>
-
-            <div class="download-stack">
-              <a class="download-item" data-link="ios" href="#" target="_blank" rel="noreferrer">
-                <div>
-                  <strong>iOS App Store</strong>
-                  <span>Open the current App Store search entry for iCodex.</span>
-                </div>
-                <em>iPhone</em>
-              </a>
-
-              <a class="download-item" data-link="dmg" href="#">
-                <div>
-                  <strong>iCodex-Connect.dmg</strong>
-                  <span>Primary Mac installer for the menu bar companion.</span>
-                </div>
-                <em>macOS</em>
-              </a>
-
-              <a class="download-item" data-link="appZip" href="#">
-                <div>
-                  <strong>iCodex-Connect.app.zip</strong>
-                  <span>Direct app bundle zip if you want the raw app artifact.</span>
-                </div>
-                <em>zip</em>
-              </a>
-            </div>
-
-            <div class="meta-grid">
-              <div>
-                <span>Release</span>
-                <strong>v<span data-build-version></span></strong>
-              </div>
-              <div>
-                <span>Minimum macOS</span>
-                <strong><span data-min-macos></span></strong>
-              </div>
-              <div>
-                <span>Bridge</span>
-                <strong>Local Wi-Fi</strong>
-              </div>
-              <div>
-                <span>Access</span>
-                <strong>Accessibility</strong>
-              </div>
-            </div>
-
-            <div class="checksum-card">
-              <p>SHA-256</p>
-              <code data-dmg-checksum></code>
-              <code data-app-checksum></code>
-            </div>
-          </aside>
-        </section>
-      </main>
-
-      <footer class="site-footer">
+    <!-- FOOTER -->
+    <footer class="footer">
+      <div class="container">
         <div class="footer-links">
           <a href="/privacy/">Privacy</a>
           <a href="/support/">Support</a>
+          <a href="https://github.com/adidshaft/iCodex">GitHub</a>
+          <a href="https://kyokasuigetsu.xyz" target="_blank" rel="noreferrer">Kyoka Suigetsu</a>
         </div>
-        <p>
-          Built around your own Codex workflow. Mac companion version
-          <span data-build-version></span>.
+        <p class="cta-footnote">
+          Feel free to <a href="/support/#feedback-form">send Feedback</a> or contribute on <a href="https://github.com/adidshaft/iCodex" target="_blank" rel="noreferrer">GitHub</a>
         </p>
-      </footer>
-    </div>
+      </div>
+    </footer>
 
     <script type="module" src="/src/main.js"></script>
   </body>
