@@ -1,7 +1,7 @@
 import "./styles.css";
 
 const appLinks = {
-  ios:    "https://apps.apple.com/us/search?term=iCodex",
+  ios:    "https://apps.apple.com/in/app/icodex/id6760627147",
   dmg:    "https://github.com/adidshaft/iCodex/releases/download/main-build/iCodex-Connect.dmg",
   appZip: "https://github.com/adidshaft/iCodex/releases/download/main-build/iCodex-Connect.app.zip",
 };
