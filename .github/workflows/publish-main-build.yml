@@ -52,21 +52,16 @@ jobs:
             exit 1
           fi
 
-      - name: Import Developer ID certificate and notarization credentials
+      - name: Decode release signing assets
         env:
           MACOS_DEVELOPER_ID_CERT_P12_BASE64: ${{ secrets.MACOS_DEVELOPER_ID_CERT_P12_BASE64 }}
-          MACOS_DEVELOPER_ID_CERT_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_CERT_PASSWORD }}
-          MACOS_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
           APPLE_NOTARY_API_KEY_P8_BASE64: ${{ secrets.APPLE_NOTARY_API_KEY_P8_BASE64 }}
-          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
           APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
         run: |
           set -euo pipefail
 
           CERT_PATH="$RUNNER_TEMP/developer-id-application.p12"
           API_KEY_PATH="$RUNNER_TEMP/AuthKey_${APPLE_NOTARY_KEY_ID}.p8"
-          KEYCHAIN_PATH="$RUNNER_TEMP/icodex-signing.keychain-db"
-          NOTARY_PROFILE="iCodexNotary"
 
           decode_base64() {
             if base64 --help 2>&1 | grep -q -- '--decode'; then
@@ -79,45 +74,92 @@ jobs:
           echo "$MACOS_DEVELOPER_ID_CERT_P12_BASE64" | decode_base64 > "$CERT_PATH"
           echo "$APPLE_NOTARY_API_KEY_P8_BASE64" | decode_base64 > "$API_KEY_PATH"
 
-          security create-keychain -p "$MACOS_KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
-          security unlock-keychain -p "$MACOS_KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security import "$CERT_PATH" \
-            -A \
-            -k "$KEYCHAIN_PATH" \
-            -P "$MACOS_DEVELOPER_ID_CERT_PASSWORD" \
-            -f pkcs12 \
-            -T /usr/bin/codesign \
-            -T /usr/bin/security
-          security set-key-partition-list \
-            -S apple-tool:,apple:,codesign: \
-            -s \
-            -k "$MACOS_KEYCHAIN_PASSWORD" \
-            "$KEYCHAIN_PATH"
-          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
-          security default-keychain -d user -s "$KEYCHAIN_PATH"
-
-          xcrun notarytool store-credentials "$NOTARY_PROFILE" \
-            --key "$API_KEY_PATH" \
-            --key-id "$APPLE_NOTARY_KEY_ID" \
-            --issuer "$APPLE_NOTARY_ISSUER_ID" \
-            --keychain "$KEYCHAIN_PATH"
-
           {
-            echo "MACOS_SIGNING_KEYCHAIN=$KEYCHAIN_PATH"
-            echo "MACOS_NOTARY_PROFILE=$NOTARY_PROFILE"
+            echo "MACOS_CERT_PATH=$CERT_PATH"
+            echo "MACOS_NOTARY_API_KEY_PATH=$API_KEY_PATH"
           } >> "$GITHUB_ENV"
 
       - name: Build macOS app and DMG
         working-directory: MacBackend
         env:
-          CODE_SIGN_IDENTITY: ${{ secrets.MACOS_DEVELOPER_ID_IDENTITY }}
-          CODE_SIGN_KEYCHAIN: ${{ env.MACOS_SIGNING_KEYCHAIN }}
-          NOTARYTOOL_PROFILE: ${{ env.MACOS_NOTARY_PROFILE }}
-          SIGN_APP: "1"
-          NOTARIZE_DMG: "1"
-          REQUIRE_SIGNED_RELEASE: "1"
+          SIGN_APP: "0"
+          NOTARIZE_DMG: "0"
+          REQUIRE_SIGNED_RELEASE: "0"
         run: bash build_dmg.sh
+
+      - name: Install rcodesign
+        run: cargo install apple-codesign --locked
+
+      - name: Sign and notarize macOS app and DMG
+        working-directory: MacBackend
+        env:
+          MACOS_CERT_PATH: ${{ env.MACOS_CERT_PATH }}
+          MACOS_DEVELOPER_ID_CERT_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_CERT_PASSWORD }}
+          APPLE_NOTARY_API_KEY_PATH: ${{ env.MACOS_NOTARY_API_KEY_PATH }}
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+        run: |
+          set -euo pipefail
+
+          APP_NAME="iCodex-Connect"
+          BUILD_DIR="build"
+          STAGING_APP="$BUILD_DIR/dmg-staging/${APP_NAME}.app"
+          STANDALONE_APP="$BUILD_DIR/${APP_NAME}.app"
+          API_JSON="$RUNNER_TEMP/appstoreconnect-api-key.json"
+          DMG_PATH="$(find "$BUILD_DIR" -maxdepth 1 -name "${APP_NAME}-*.dmg" | head -n 1)"
+
+          if [ ! -d "$STAGING_APP" ] || [ ! -d "$STANDALONE_APP" ] || [ -z "$DMG_PATH" ]; then
+            echo "Expected unsigned app bundle outputs were not created." >&2
+            exit 1
+          fi
+
+          rcodesign encode-app-store-connect-api-key \
+            --output-path "$API_JSON" \
+            "$APPLE_NOTARY_ISSUER_ID" \
+            "$APPLE_NOTARY_KEY_ID" \
+            "$APPLE_NOTARY_API_KEY_PATH"
+
+          rcodesign sign \
+            --p12-file "$MACOS_CERT_PATH" \
+            --p12-password "$MACOS_DEVELOPER_ID_CERT_PASSWORD" \
+            --for-notarization \
+            "$STAGING_APP"
+
+          rcodesign sign \
+            --p12-file "$MACOS_CERT_PATH" \
+            --p12-password "$MACOS_DEVELOPER_ID_CERT_PASSWORD" \
+            --for-notarization \
+            "$STANDALONE_APP"
+
+          rm -f "$DMG_PATH"
+          hdiutil create \
+            -volname "$APP_NAME" \
+            -srcfolder "$BUILD_DIR/dmg-staging" \
+            -ov \
+            -format UDZO \
+            -imagekey zlib-level=9 \
+            "$DMG_PATH"
+
+          rcodesign sign \
+            --p12-file "$MACOS_CERT_PATH" \
+            --p12-password "$MACOS_DEVELOPER_ID_CERT_PASSWORD" \
+            --for-notarization \
+            "$DMG_PATH"
+
+          rcodesign notary-submit \
+            --api-key-file "$API_JSON" \
+            --wait \
+            --staple \
+            "$DMG_PATH"
+
+          xcrun stapler validate "$DMG_PATH"
+
+          MOUNT_DIR="$RUNNER_TEMP/icodex-release-check"
+          rm -rf "$MOUNT_DIR"
+          mkdir -p "$MOUNT_DIR"
+          hdiutil attach "$DMG_PATH" -nobrowse -readonly -mountpoint "$MOUNT_DIR" >/dev/null
+          spctl --assess -vv "$MOUNT_DIR/${APP_NAME}.app"
+          hdiutil detach "$MOUNT_DIR" >/dev/null
 
       - name: Prepare stable release assets
         working-directory: MacBackend
@@ -181,10 +223,8 @@ jobs:
             - `https://github.com/${{ github.repository }}/releases/download/main-build/iCodex-Connect.dmg`
             - `https://github.com/${{ github.repository }}/releases/download/main-build/iCodex-Connect.app.zip`
 
-      - name: Clean up signing keychain
+      - name: Clean up decoded signing assets
         if: always()
         run: |
           set -euo pipefail
-          if [ -n "${MACOS_SIGNING_KEYCHAIN:-}" ] && [ -f "${MACOS_SIGNING_KEYCHAIN}" ]; then
-            security delete-keychain "${MACOS_SIGNING_KEYCHAIN}" || true
-          fi
+          rm -f "${MACOS_CERT_PATH:-}" "${MACOS_NOTARY_API_KEY_PATH:-}" || true
