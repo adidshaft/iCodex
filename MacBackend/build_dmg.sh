@@ -72,7 +72,11 @@ sign_app_bundle() {
     fi
 
     info "Signing app bundle with identity: $CODE_SIGN_IDENTITY"
-    codesign --force --sign "$CODE_SIGN_IDENTITY" --timestamp --options runtime "$MACOS_DIR/icodex_keystroke"
+    for nested_code in "$MACOS_DIR"/*; do
+        if [ -f "$nested_code" ] && [ -x "$nested_code" ]; then
+            codesign --force --sign "$CODE_SIGN_IDENTITY" --timestamp --options runtime "$nested_code"
+        fi
+    done
     codesign --force --sign "$CODE_SIGN_IDENTITY" --timestamp --options runtime --deep "$APP_DIR"
     codesign --verify --deep --strict --verbose=2 "$APP_DIR"
     ok "App bundle signed."
