@@ -124,3 +124,22 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 ```
+
+## macOS Release Signing
+
+The rolling GitHub release for `iCodex-Connect` is intended to publish only
+Developer ID signed and notarized macOS downloads.
+
+Required GitHub Actions secrets:
+
+- `MACOS_DEVELOPER_ID_CERT_P12_BASE64`
+- `MACOS_DEVELOPER_ID_CERT_PASSWORD`
+- `MACOS_DEVELOPER_ID_IDENTITY`
+- `MACOS_KEYCHAIN_PASSWORD`
+- `APPLE_NOTARY_API_KEY_P8_BASE64`
+- `APPLE_NOTARY_ISSUER_ID`
+- `APPLE_NOTARY_KEY_ID`
+
+The workflow in `.github/workflows/publish-main-build.yml` fails closed if any
+of these are missing, so future release updates do not publish unsigned or
+unnotarized DMGs by accident.

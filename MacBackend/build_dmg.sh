@@ -21,6 +21,7 @@ CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY:-}"
 NOTARYTOOL_PROFILE="${NOTARYTOOL_PROFILE:-}"
 SIGN_APP="${SIGN_APP:-0}"
 NOTARIZE_DMG="${NOTARIZE_DMG:-0}"
+REQUIRE_SIGNED_RELEASE="${REQUIRE_SIGNED_RELEASE:-0}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -32,6 +33,32 @@ info()  { echo -e "${BLUE}[Build]${NC} $*"; }
 ok()    { echo -e "${GREEN}[Build]${NC} $*"; }
 warn()  { echo -e "${YELLOW}[Build]${NC} $*"; }
 error() { echo -e "${RED}[Build]${NC} $*"; }
+
+enforce_release_requirements() {
+    if [ "$REQUIRE_SIGNED_RELEASE" != "1" ]; then
+        return
+    fi
+
+    if [ "$SIGN_APP" != "1" ]; then
+        error "REQUIRE_SIGNED_RELEASE=1 requires SIGN_APP=1."
+        exit 1
+    fi
+
+    if [ "$NOTARIZE_DMG" != "1" ]; then
+        error "REQUIRE_SIGNED_RELEASE=1 requires NOTARIZE_DMG=1."
+        exit 1
+    fi
+
+    if [ -z "$CODE_SIGN_IDENTITY" ]; then
+        error "REQUIRE_SIGNED_RELEASE=1 requires CODE_SIGN_IDENTITY to be set."
+        exit 1
+    fi
+
+    if [ -z "$NOTARYTOOL_PROFILE" ]; then
+        error "REQUIRE_SIGNED_RELEASE=1 requires NOTARYTOOL_PROFILE to be set."
+        exit 1
+    fi
+}
 
 sign_app_bundle() {
     if [ "$SIGN_APP" != "1" ] && [ -z "$CODE_SIGN_IDENTITY" ]; then
@@ -77,11 +104,34 @@ notarize_dmg_if_configured() {
     ok "DMG notarized and stapled."
 }
 
+verify_release_artifacts() {
+    if [ "$SIGN_APP" != "1" ] && [ "$REQUIRE_SIGNED_RELEASE" != "1" ]; then
+        warn "Skipping release verification because signing is disabled."
+        return
+    fi
+
+    info "Verifying standalone app signature..."
+    codesign --verify --deep --strict --verbose=2 "$STANDALONE_APP_DIR"
+    spctl --assess -vv "$STANDALONE_APP_DIR"
+
+    info "Verifying DMG Gatekeeper assessment..."
+    spctl --assess -vv --type open "$BUILD_DIR/$DMG_FILENAME"
+
+    if [ "$NOTARIZE_DMG" = "1" ]; then
+        info "Validating stapled notarization ticket..."
+        xcrun stapler validate "$BUILD_DIR/$DMG_FILENAME"
+    fi
+
+    ok "Release artifacts verified."
+}
+
 echo ""
 echo "=================================================="
 echo "  iCodex-Connect DMG Builder v${DMG_VERSION}"
 echo "=================================================="
 echo ""
+
+enforce_release_requirements
 
 # ── Clean ────────────────────────────────────────────────────────────────
 info "Cleaning previous build..."
@@ -292,6 +342,9 @@ ok "DMG created: $BUILD_DIR/$DMG_FILENAME"
 
 # ── Optional notarization ────────────────────────────────────────────────
 notarize_dmg_if_configured
+
+# ── Release verification ──────────────────────────────────────────────────
+verify_release_artifacts
 
 # ── Summary ──────────────────────────────────────────────────────────────
 DMG_SIZE=$(du -sh "$BUILD_DIR/$DMG_FILENAME" | cut -f1)

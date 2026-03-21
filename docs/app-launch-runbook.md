@@ -53,7 +53,7 @@ Release-relevant settings already present:
   This app depends on a user-owned Mac companion and a local-network setup. Apple explicitly asks for demo accounts, hardware, or a demo video when review requires a special environment or hardware. Plan this before the first submission.
 
 - [ ] Sign and notarize the Mac companion for website download.
-  The current DMG script builds a distributable image, but it does not perform Developer ID signing, hardened runtime signing, notarization, or stapling.
+  The GitHub release workflow should fail closed unless Developer ID signing and notarization credentials are configured. Keep that path healthy and verify the published DMG remains stapled and Gatekeeper-clean.
 
 - [ ] Reduce friction in the Mac installer.
   The current Mac app expects a system Python install and then creates a venv and installs Python packages on first launch. That is risky for a public download. Prefer bundling the runtime and dependencies into the app before launch.
