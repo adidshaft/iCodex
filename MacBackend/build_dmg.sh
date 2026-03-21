@@ -225,7 +225,7 @@ INFOPLIST
 
 # ── Launcher executable ──────────────────────────────────────────────────
 info "Creating launcher..."
-cat > "$MACOS_DIR/icodex_launcher_impl" << 'LAUNCHER'
+cat > "$RESOURCES_DIR/icodex_launcher.sh" << 'LAUNCHER'
 #!/usr/bin/env bash
 #
 # iCodex-Connect launcher — runs inside the .app bundle.
@@ -282,7 +282,7 @@ sleep 0.5
 cd "$BACKEND_DIR"
 exec "$VENV_DIR/bin/python" menubar_app.py >>"$LOG_DIR/icodex.log" 2>&1
 LAUNCHER
-chmod +x "$MACOS_DIR/icodex_launcher_impl"
+chmod +x "$RESOURCES_DIR/icodex_launcher.sh"
 
 # ── Compile native keystroke helper ───────────────────────────────────
 info "Compiling native keystroke helper..."

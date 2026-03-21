@@ -578,11 +578,14 @@ func launchBackend() {
     cleanupMountedInstallerVolumes(appNamed: appName, excluding: appURL)
 
     let macosDir = (execPath as NSString).deletingLastPathComponent
-    let launcher = (macosDir as NSString).appendingPathComponent("icodex_launcher_impl")
+    let contentsDir = (macosDir as NSString).deletingLastPathComponent
+    let resourcesDir = (contentsDir as NSString).appendingPathComponent("Resources")
+    let launcher = (resourcesDir as NSString).appendingPathComponent("icodex_launcher.sh")
     let requestedAccessibility = requestAccessibilityIfNeeded()
 
     let task = Process()
-    task.executableURL = URL(fileURLWithPath: launcher)
+    task.executableURL = URL(fileURLWithPath: "/bin/bash")
+    task.arguments = [launcher]
     task.currentDirectoryURL = URL(fileURLWithPath: macosDir)
     var environment = ProcessInfo.processInfo.environment
     if requestedAccessibility {
