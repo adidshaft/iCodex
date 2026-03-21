@@ -83,6 +83,7 @@ jobs:
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$MACOS_KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security import "$CERT_PATH" \
+            -A \
             -k "$KEYCHAIN_PATH" \
             -P "$MACOS_DEVELOPER_ID_CERT_PASSWORD" \
             -f pkcs12 \
@@ -111,6 +112,7 @@ jobs:
         working-directory: MacBackend
         env:
           CODE_SIGN_IDENTITY: ${{ secrets.MACOS_DEVELOPER_ID_IDENTITY }}
+          CODE_SIGN_KEYCHAIN: ${{ env.MACOS_SIGNING_KEYCHAIN }}
           NOTARYTOOL_PROFILE: ${{ env.MACOS_NOTARY_PROFILE }}
           SIGN_APP: "1"
           NOTARIZE_DMG: "1"

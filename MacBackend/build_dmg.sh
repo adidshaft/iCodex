@@ -3,9 +3,10 @@
 # build_dmg.sh - Package iCodex-Connect into a distributable .dmg
 #
 set -euo pipefail
+export COPYFILE_DISABLE=1
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-BUILD_DIR="$SCRIPT_DIR/build"
+BUILD_DIR="${BUILD_DIR:-$SCRIPT_DIR/build}"
 APP_NAME="iCodex-Connect"
 DMG_VERSION="2.1.0"
 DMG_FILENAME="${APP_NAME}-${DMG_VERSION}.dmg"
@@ -18,6 +19,7 @@ RESOURCES_DIR="$CONTENTS_DIR/Resources"
 BACKEND_BUNDLE="$RESOURCES_DIR/MacBackend"
 LOGO_PNG="$SCRIPT_DIR/../logo.png"
 CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY:-}"
+CODE_SIGN_KEYCHAIN="${CODE_SIGN_KEYCHAIN:-}"
 NOTARYTOOL_PROFILE="${NOTARYTOOL_PROFILE:-}"
 SIGN_APP="${SIGN_APP:-0}"
 NOTARIZE_DMG="${NOTARIZE_DMG:-0}"
@@ -33,6 +35,14 @@ info()  { echo -e "${BLUE}[Build]${NC} $*"; }
 ok()    { echo -e "${GREEN}[Build]${NC} $*"; }
 warn()  { echo -e "${YELLOW}[Build]${NC} $*"; }
 error() { echo -e "${RED}[Build]${NC} $*"; }
+
+codesign_cmd() {
+    if [ -n "$CODE_SIGN_KEYCHAIN" ]; then
+        codesign --keychain "$CODE_SIGN_KEYCHAIN" "$@"
+    else
+        codesign "$@"
+    fi
+}
 
 enforce_release_requirements() {
     if [ "$REQUIRE_SIGNED_RELEASE" != "1" ]; then
@@ -74,11 +84,11 @@ sign_app_bundle() {
     info "Signing app bundle with identity: $CODE_SIGN_IDENTITY"
     for nested_code in "$MACOS_DIR"/*; do
         if [ -f "$nested_code" ] && [ -x "$nested_code" ]; then
-            codesign --force --sign "$CODE_SIGN_IDENTITY" --timestamp --options runtime "$nested_code"
+            codesign_cmd --force --sign "$CODE_SIGN_IDENTITY" --timestamp --options runtime "$nested_code"
         fi
     done
-    codesign --force --sign "$CODE_SIGN_IDENTITY" --timestamp --options runtime --deep "$APP_DIR"
-    codesign --verify --deep --strict --verbose=2 "$APP_DIR"
+    codesign_cmd --force --sign "$CODE_SIGN_IDENTITY" --timestamp --options runtime --deep "$APP_DIR"
+    codesign_cmd --verify --deep --strict --verbose=2 "$APP_DIR"
     ok "App bundle signed."
 }
 
@@ -231,6 +241,7 @@ cat > "$RESOURCES_DIR/icodex_launcher.sh" << 'LAUNCHER'
 # iCodex-Connect launcher — runs inside the .app bundle.
 #
 set -euo pipefail
+export COPYFILE_DISABLE=1
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CONTENTS_DIR="$(dirname "$SCRIPT_DIR")"
