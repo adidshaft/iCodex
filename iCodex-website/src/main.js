@@ -36,6 +36,23 @@ if (dmgEl) dmgEl.textContent = releaseMeta.dmgChecksum;
 const appEl = document.querySelector("[data-app-checksum]");
 if (appEl) appEl.textContent = releaseMeta.appChecksum;
 
+/* ── copy ios link ────────────────────────────────────────────── */
+const copyIosLinkBtn = document.getElementById("copy-ios-link");
+if (copyIosLinkBtn) {
+  copyIosLinkBtn.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(appLinks.ios);
+      const originalText = copyIosLinkBtn.innerHTML;
+      copyIosLinkBtn.innerHTML = "Copied!";
+      setTimeout(() => {
+        copyIosLinkBtn.innerHTML = originalText;
+      }, 2000);
+    } catch (e) {
+      console.error("Failed to copy link:", e);
+    }
+  });
+}
+
 /* ── theme toggle ─────────────────────────────────────────────── */
 const THEME_KEY = "icodex-theme";
 const html      = document.documentElement;
