@@ -14,8 +14,8 @@ const supabaseConfig = {
 const releaseMeta = {
   version:     "2.1.0",
   minimumMacOS:"12+",
-  dmgChecksum: "DMG  56bdbe64124374090cce41c79fa3d9e2b9a94b5abc68262a6d63d7c045c0cf0d",
-  appChecksum: "ZIP  c154c906414afd1cf6a2bce7732f20fe2659154e52f9ce054d5ac7a5ed879141",
+  dmgChecksum: "DMG  e81f7eb1c1668580433b8453a553868a6160de1990ab6771e52af4c9f735be79",
+  appChecksum: "ZIP  fdbe353e4c02d9287d11e226dbc4e3370542bcac13ea5e294a0f64fb5b7e74a4",
 };
 
 /* ── hydrate links ────────────────────────────────────────────── */
