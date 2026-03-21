@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - main
+    paths:
+      - .github/workflows/publish-main-build.yml
+      - MacBackend/**
+      - logo.png
   workflow_dispatch:
 
 permissions:
