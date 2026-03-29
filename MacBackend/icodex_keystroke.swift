@@ -179,26 +179,6 @@ func promptToInstallInApplications(appURL: URL) -> Never {
     exit(0)
 }
 
-func openAccessibilitySettings() {
-    guard let settingsURL = URL(
-        string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
-    ) else {
-        return
-    }
-    NSWorkspace.shared.open(settingsURL)
-}
-
-@discardableResult
-func requestAccessibilityIfNeeded() -> Bool {
-    guard !CGPreflightPostEventAccess() else {
-        return false
-    }
-
-    CGRequestPostEventAccess()
-    openAccessibilitySettings()
-    return true
-}
-
 func postKeystroke(keyCode: CGKeyCode, flags: CGEventFlags = []) {
     guard let keyDown = CGEvent(keyboardEventSource: nil, virtualKey: keyCode, keyDown: true),
           let keyUp = CGEvent(keyboardEventSource: nil, virtualKey: keyCode, keyDown: false)
@@ -589,17 +569,11 @@ func launchBackend() {
     let contentsDir = (macosDir as NSString).deletingLastPathComponent
     let resourcesDir = (contentsDir as NSString).appendingPathComponent("Resources")
     let launcher = (resourcesDir as NSString).appendingPathComponent("icodex_launcher.sh")
-    let requestedAccessibility = requestAccessibilityIfNeeded()
-
     let task = Process()
     task.executableURL = URL(fileURLWithPath: "/bin/bash")
     task.arguments = [launcher]
     task.currentDirectoryURL = URL(fileURLWithPath: macosDir)
-    var environment = ProcessInfo.processInfo.environment
-    if requestedAccessibility {
-        environment["ICODEX_SHOW_A11Y_GUIDANCE"] = "1"
-    }
-    task.environment = environment
+    task.environment = ProcessInfo.processInfo.environment
     // Detach: launcher runs in background, we exit so macOS is happy
     do {
         try task.run()

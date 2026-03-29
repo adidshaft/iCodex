@@ -328,8 +328,9 @@ ln -s /Applications "$STAGING_DIR/Applications"
 cat > "$STAGING_DIR/Install iCodex-Connect.txt" << 'INSTALLNOTE'
 1. Drag iCodex-Connect.app into Applications.
 2. Open iCodex-Connect from Applications, or open it here and choose "Install and Open".
-3. When macOS opens Accessibility settings, add iCodex-Connect and toggle it ON.
-4. The installer volume should eject automatically after the app relaunches.
+3. If remote controls are unavailable, click Accessibility in the iCodex-Connect menu bar app and enable it once.
+4. Use "Download Latest Build" in the menu bar app whenever you want the newest public release.
+5. The installer volume should eject automatically after the app relaunches.
 INSTALLNOTE
 
 # ── Standalone app bundle for local testing ───────────────────────────────

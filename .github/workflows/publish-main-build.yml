@@ -4,10 +4,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - .github/workflows/publish-main-build.yml
-      - MacBackend/**
-      - logo.png
   workflow_dispatch:
 
 permissions:
@@ -55,6 +51,21 @@ jobs:
             echo "Refusing to publish unsigned or unnotarized release artifacts." >&2
             exit 1
           fi
+
+      - name: Extract release metadata
+        run: |
+          set -euo pipefail
+
+          version="$(sed -n 's/^DMG_VERSION=\"\([^\"]*\)\"$/\1/p' MacBackend/build_dmg.sh | head -n 1)"
+          if [ -z "$version" ]; then
+            echo "Could not determine DMG_VERSION from MacBackend/build_dmg.sh" >&2
+            exit 1
+          fi
+
+          {
+            echo "RELEASE_VERSION=$version"
+            echo "RELEASE_MIN_MACOS=12+"
+          } >> "$GITHUB_ENV"
 
       - name: Decode release signing assets
         env:
@@ -209,17 +220,21 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           tag: main-build
-          name: Main Build
+          name: Main Build · v${{ env.RELEASE_VERSION }}
           allowUpdates: true
           removeArtifacts: true
           replacesArtifacts: true
-          prerelease: true
+          prerelease: false
+          makeLatest: true
           artifacts: |
             MacBackend/release/iCodex-Connect.dmg
             MacBackend/release/iCodex-Connect.app.zip
             MacBackend/release/SHA256SUMS.txt
           body: |
             Automated rolling build from `${{ github.sha }}` on `main`.
+
+            Version: `${{ env.RELEASE_VERSION }}`
+            Minimum macOS: `${{ env.RELEASE_MIN_MACOS }}`
 
             This release is Developer ID signed and notarized before publication.
 

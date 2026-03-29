@@ -29,6 +29,9 @@ Edit `src/main.js`:
 - `appLinks.appZip` for the direct Mac app zip
 
 Current downloads point at the rolling GitHub release assets under `main-build`.
+The website also reads release metadata from `releases/tags/main-build`, so each new
+main push that republishes the rolling release shows up on the site without editing
+the website again.
 
 ## Routes
 

@@ -8,7 +8,7 @@ const appLinks = {
 };
 
 const githubReleaseApi =
-  "https://api.github.com/repos/adidshaft/iCodex/releases/latest";
+  "https://api.github.com/repos/adidshaft/iCodex/releases/tags/main-build";
 
 const supabaseConfig = {
   url:     import.meta.env.VITE_SUPABASE_URL     ?? "",
@@ -80,6 +80,24 @@ const renderReleaseNotes = (notes) => {
   }
 };
 
+const extractReleaseMetadata = (release) => {
+  const combinedText = [release?.name, release?.body]
+    .filter(Boolean)
+    .join("\n");
+
+  const versionMatch =
+    combinedText.match(/(?:^|\n)Version:\s*`?([^\n`]+)`?/i) ||
+    combinedText.match(/\bv(\d+(?:\.\d+){1,3}(?:[-+.\w]+)?)\b/i);
+  const minimumMacOSMatch = combinedText.match(
+    /(?:^|\n)Minimum macOS:\s*`?([^\n`]+)`?/i,
+  );
+
+  return {
+    version: versionMatch?.[1]?.trim() || null,
+    minimumMacOS: minimumMacOSMatch?.[1]?.trim() || null,
+  };
+};
+
 const hydrateDownloadLinks = () => {
   for (const el of document.querySelectorAll("[data-link]")) {
     const key = el.dataset.link;
@@ -135,6 +153,7 @@ const hydrateLatestRelease = async () => {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const release = await response.json();
+    const metadata = extractReleaseMetadata(release);
     const notes = summarizeReleaseBody(release.body);
     const publishedText = release.published_at
       ? new Date(release.published_at).toLocaleDateString(undefined, {
@@ -146,9 +165,19 @@ const hydrateLatestRelease = async () => {
 
     if (release.tag_name && releaseTagEl) {
       releaseTagEl.textContent = release.tag_name;
-      releaseMeta.version = release.tag_name;
+    }
+
+    if (metadata.version) {
+      releaseMeta.version = metadata.version;
       for (const el of document.querySelectorAll("[data-build-version]")) {
         el.textContent = releaseMeta.version;
+      }
+    }
+
+    if (metadata.minimumMacOS) {
+      releaseMeta.minimumMacOS = metadata.minimumMacOS;
+      for (const el of document.querySelectorAll("[data-min-macos]")) {
+        el.textContent = releaseMeta.minimumMacOS;
       }
     }
 
@@ -194,7 +223,7 @@ const hydrateLatestRelease = async () => {
       hydrateChecksums();
     }
   } catch (error) {
-    console.error("Failed to load latest release:", error);
+    console.error("Failed to load rolling release:", error);
     if (releaseTagEl) releaseTagEl.textContent = "main-build";
     releaseNameEl.textContent = "Newest iCodex build is live";
     releaseDateEl.textContent =

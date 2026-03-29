@@ -22,6 +22,7 @@ AUTH_FILE = Path.home() / ".codex" / "icodex_auth.json"
 DATA_DIR = Path.home() / "Library" / "Application Support" / "iCodex-Connect"
 LOG_DIR = DATA_DIR / "logs"
 VOLUMES_DIR = Path("/Volumes")
+LATEST_DMG_URL = "https://github.com/adidshaft/iCodex/releases/download/main-build/iCodex-Connect.dmg"
 
 # ── Python discovery chain ────────────────────────────────────────────────────
 # 1. app-support venv  2. venv in current dir  3. running interpreter
@@ -146,6 +147,13 @@ def _read_passcode() -> str:
 def _copy(text: str) -> None:
     try:
         subprocess.run(["pbcopy"], input=text.encode(), check=True, timeout=5)
+    except Exception:
+        pass
+
+
+def _open_url(url: str) -> None:
+    try:
+        subprocess.run(["open", url], check=False, timeout=10)
     except Exception:
         pass
 
@@ -418,6 +426,11 @@ class ICodexMenuBarApp(rumps.App):
             callback=self.on_show_pairing_qr,
         )
 
+        self.update_item = rumps.MenuItem(
+            "  Download Latest Build",
+            callback=self.on_download_latest_build,
+        )
+
         self.devices_menu = rumps.MenuItem("Devices (0)")
         # Don't call _rebuild_devices_menu() here — NSMenu isn't created until run()
 
@@ -436,6 +449,7 @@ class ICodexMenuBarApp(rumps.App):
             self.url_item,
             self.passcode_item,
             self.qr_item,
+            self.update_item,
             None,
             self.a11y_item,
             self.devices_menu,
@@ -449,8 +463,6 @@ class ICodexMenuBarApp(rumps.App):
         self._a11y_granted: bool | None = None  # cached result
         self._a11y_last_check: float = 0
         self._a11y_watch_until: float = 0
-        self._startup_a11y_guidance_timer: rumps.Timer | None = None
-        self._show_startup_a11y_guidance = os.environ.get("ICODEX_SHOW_A11Y_GUIDANCE") == "1"
 
         # If we're running from Applications, clean up stale installer volumes
         # left behind by previous DMG opens.
@@ -466,9 +478,6 @@ class ICodexMenuBarApp(rumps.App):
         self._timer = rumps.Timer(self._refresh, 5)
         self._timer.start()
         self._refresh(None)
-        if self._show_startup_a11y_guidance:
-            self._startup_a11y_guidance_timer = rumps.Timer(self._show_a11y_guidance_once, 1)
-            self._startup_a11y_guidance_timer.start()
 
         atexit.register(self._perform_shutdown_cleanup)
         for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
@@ -478,25 +487,6 @@ class ICodexMenuBarApp(rumps.App):
                 pass
 
     # ── Refresh loop ──────────────────────────────────────────────────────
-
-    def _show_a11y_guidance_once(self, _sender):
-        if self._startup_a11y_guidance_timer is not None:
-            self._startup_a11y_guidance_timer.stop()
-            self._startup_a11y_guidance_timer = None
-
-        if _check_accessibility():
-            self._a11y_granted = True
-            self._a11y_last_check = _time.time()
-            self._a11y_watch_until = 0
-            self._refresh(None)
-            return
-
-        rumps.notification(
-            "iCodex-Connect",
-            "Grant Accessibility",
-            "System Settings is opening. Add iCodex-Connect and toggle it ON, then return to the menu bar.",
-        )
-        _open_accessibility_settings()
 
     def _refresh(self, _sender):
         running = _is_port_in_use(PORT)
@@ -800,6 +790,14 @@ class ICodexMenuBarApp(rumps.App):
 
         self._update_pairing_qr_window(local_ip, passcode)
         self._pairing_qr_window.makeKeyAndOrderFront_(None)
+
+    def on_download_latest_build(self, _sender):
+        _open_url(LATEST_DMG_URL)
+        rumps.notification(
+            "iCodex",
+            "Latest Build",
+            "Downloading the latest iCodex-Connect DMG from the rolling GitHub release.",
+        )
 
     def on_open_accessibility(self, _sender):
         if _check_accessibility():
