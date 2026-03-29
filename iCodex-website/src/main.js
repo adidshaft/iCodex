@@ -4,7 +4,11 @@ const appLinks = {
   ios:    "https://apps.apple.com/in/app/icodex/id6760627147",
   dmg:    "https://github.com/adidshaft/iCodex/releases/download/main-build/iCodex-Connect.dmg",
   appZip: "https://github.com/adidshaft/iCodex/releases/download/main-build/iCodex-Connect.app.zip",
+  sha256: "https://github.com/adidshaft/iCodex/releases/download/main-build/SHA256SUMS.txt",
 };
+
+const githubReleaseApi =
+  "https://api.github.com/repos/adidshaft/iCodex/releases/latest";
 
 const supabaseConfig = {
   url:     import.meta.env.VITE_SUPABASE_URL     ?? "",
@@ -14,15 +18,11 @@ const supabaseConfig = {
 const releaseMeta = {
   version:     "2.1.0",
   minimumMacOS:"12+",
-  dmgChecksum: "DMG  e81f7eb1c1668580433b8453a553868a6160de1990ab6771e52af4c9f735be79",
-  appChecksum: "ZIP  fdbe353e4c02d9287d11e226dbc4e3370542bcac13ea5e294a0f64fb5b7e74a4",
+  dmgChecksum: "DMG  Loading...",
+  appChecksum: "ZIP  Loading...",
 };
 
 /* ── hydrate links ────────────────────────────────────────────── */
-for (const el of document.querySelectorAll("[data-link]")) {
-  const k = el.dataset.link;
-  if (k && appLinks[k]) el.href = appLinks[k];
-}
 
 for (const el of document.querySelectorAll("[data-build-version]"))
   el.textContent = releaseMeta.version;
@@ -35,6 +35,176 @@ if (dmgEl) dmgEl.textContent = releaseMeta.dmgChecksum;
 
 const appEl = document.querySelector("[data-app-checksum]");
 if (appEl) appEl.textContent = releaseMeta.appChecksum;
+
+const releaseTagEl = document.querySelector("[data-release-tag]");
+const releaseNameEl = document.querySelector("[data-release-name]");
+const releaseDateEl = document.querySelector("[data-release-date]");
+const releaseNotesEl = document.querySelector("[data-release-notes]");
+
+const stripMarkdown = (value) =>
+  value
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/[*_>#]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const summarizeReleaseBody = (body) => {
+  if (!body) return [];
+
+  const bulletNotes = body
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => /^[-*]\s+/.test(line))
+    .map((line) => stripMarkdown(line.replace(/^[-*]\s+/, "")))
+    .filter((line) => line.length > 12);
+
+  if (bulletNotes.length >= 2) return bulletNotes.slice(0, 2);
+
+  const paragraphNotes = body
+    .split("\n")
+    .map((line) => stripMarkdown(line))
+    .filter((line) => line.length > 32);
+
+  return [...bulletNotes, ...paragraphNotes].slice(0, 2);
+};
+
+const renderReleaseNotes = (notes) => {
+  if (!releaseNotesEl) return;
+  releaseNotesEl.innerHTML = "";
+
+  for (const note of notes) {
+    const item = document.createElement("li");
+    item.textContent = note;
+    releaseNotesEl.appendChild(item);
+  }
+};
+
+const hydrateDownloadLinks = () => {
+  for (const el of document.querySelectorAll("[data-link]")) {
+    const key = el.dataset.link;
+    if (key && appLinks[key]) el.href = appLinks[key];
+  }
+};
+
+hydrateDownloadLinks();
+
+const hydrateLatestRelease = async () => {
+  if (!releaseNameEl || !releaseDateEl || !releaseNotesEl) return;
+
+  try {
+    const response = await fetch(githubReleaseApi, {
+      headers: {
+        Accept: "application/vnd.github+json",
+      },
+    });
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const release = await response.json();
+    const notes = summarizeReleaseBody(release.body);
+    const publishedText = release.published_at
+      ? new Date(release.published_at).toLocaleDateString(undefined, {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        })
+      : null;
+
+    if (release.tag_name && releaseTagEl) {
+      releaseTagEl.textContent = release.tag_name;
+      releaseMeta.version = release.tag_name;
+      for (const el of document.querySelectorAll("[data-build-version]")) {
+        el.textContent = releaseMeta.version;
+      }
+    }
+
+    if (release.name) {
+      releaseNameEl.textContent = release.name;
+    } else if (release.tag_name) {
+      releaseNameEl.textContent = `Latest release: ${release.tag_name}`;
+    }
+
+    releaseDateEl.textContent = publishedText
+      ? `Published ${publishedText}`
+      : "Live on GitHub Releases";
+
+    renderReleaseNotes(
+      notes.length > 0
+        ? notes
+        : [
+            "Fresh updates are live for the iPhone app and the Mac connector.",
+            "Use the download buttons above to grab the newest release build.",
+          ],
+    );
+
+    if (Array.isArray(release.assets)) {
+      const dmgAsset = release.assets.find((asset) =>
+        /\.dmg$/i.test(asset?.name || ""),
+      );
+      const appZipAsset = release.assets.find((asset) =>
+        /\.app\.zip$/i.test(asset?.name || ""),
+      );
+      const checksumAsset = release.assets.find((asset) =>
+        /sha256sums\.txt$/i.test(asset?.name || ""),
+      );
+
+      if (dmgAsset?.browser_download_url) appLinks.dmg = dmgAsset.browser_download_url;
+      if (appZipAsset?.browser_download_url) {
+        appLinks.appZip = appZipAsset.browser_download_url;
+      }
+      if (checksumAsset?.browser_download_url) {
+        appLinks.sha256 = checksumAsset.browser_download_url;
+      }
+
+      hydrateDownloadLinks();
+      hydrateChecksums();
+    }
+  } catch (error) {
+    console.error("Failed to load latest release:", error);
+    if (releaseTagEl) releaseTagEl.textContent = "main-build";
+    releaseNameEl.textContent = "Newest iCodex build is live";
+    releaseDateEl.textContent =
+      "The download buttons above always point to the latest release.";
+    renderReleaseNotes([
+      "Fresh updates ship through the latest GitHub release for the iPhone app and the Mac connector.",
+      "If GitHub is unavailable right now, the page falls back to the rolling release download links automatically.",
+    ]);
+  }
+};
+
+async function hydrateChecksums() {
+  try {
+    const response = await fetch(appLinks.sha256, { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const text = await response.text();
+    const lines = text
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    const dmgLine = lines.find((line) => line.endsWith("release/iCodex-Connect.dmg"));
+    const appLine = lines.find((line) => line.endsWith("release/iCodex-Connect.app.zip"));
+
+    if (dmgEl && dmgLine) {
+      const [hash] = dmgLine.split(/\s+/);
+      dmgEl.textContent = `DMG  ${hash}`;
+    }
+
+    if (appEl && appLine) {
+      const [hash] = appLine.split(/\s+/);
+      appEl.textContent = `ZIP  ${hash}`;
+    }
+  } catch (error) {
+    console.error("Failed to load release checksums:", error);
+    if (dmgEl) dmgEl.textContent = "DMG  See release SHA256SUMS";
+    if (appEl) appEl.textContent = "ZIP  See release SHA256SUMS";
+  }
+}
+
+hydrateChecksums();
+hydrateLatestRelease();
 
 /* ── copy ios link ────────────────────────────────────────────── */
 const copyIosLinkBtn = document.getElementById("copy-ios-link");
@@ -93,7 +263,7 @@ if (feedbackForm && feedbackStatus) {
       name:         data.get("name")        || null,
       email:        data.get("email")       || null,
       message:      data.get("message"),
-      page_context: data.get("pageContext") || "website",
+      pageContext: data.get("pageContext") || "website",
     };
 
     feedbackStatus.textContent    = "Sending…";
