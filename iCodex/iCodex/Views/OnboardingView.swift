@@ -844,8 +844,7 @@ struct OnboardingView: View {
                     passcode: passcodeInput
                 )
                 await MainActor.run {
-                    config.host = trimmedIP
-                    config.apiKey = key
+                    config.applyAuthenticatedSession(host: trimmedIP, port: config.port, apiKey: key)
                     isAuthenticating = false
                     step = .done
                 }
@@ -905,9 +904,7 @@ struct OnboardingView: View {
                     passcode: request.passcode
                 )
                 await MainActor.run {
-                    config.host = request.host
-                    config.port = request.port
-                    config.apiKey = key
+                    config.applyAuthenticatedSession(host: request.host, port: request.port, apiKey: key)
                     isAuthenticating = false
                     step = .done
                 }

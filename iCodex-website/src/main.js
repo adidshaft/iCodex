@@ -89,6 +89,39 @@ const hydrateDownloadLinks = () => {
 
 hydrateDownloadLinks();
 
+const dropdowns = [...document.querySelectorAll(".dropdown")];
+
+const closeDropdowns = () => {
+  for (const dropdown of dropdowns) {
+    dropdown.classList.remove("open");
+    const trigger = dropdown.querySelector(".dropdown-toggle");
+    if (trigger) trigger.setAttribute("aria-expanded", "false");
+  }
+};
+
+for (const dropdown of dropdowns) {
+  const trigger = dropdown.querySelector(".dropdown-toggle");
+  if (!trigger) continue;
+
+  trigger.addEventListener("click", (event) => {
+    event.preventDefault();
+    const willOpen = !dropdown.classList.contains("open");
+    closeDropdowns();
+    if (willOpen) {
+      dropdown.classList.add("open");
+      trigger.setAttribute("aria-expanded", "true");
+    }
+  });
+}
+
+document.addEventListener("click", (event) => {
+  if (!event.target.closest(".dropdown")) closeDropdowns();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeDropdowns();
+});
+
 const hydrateLatestRelease = async () => {
   if (!releaseNameEl || !releaseDateEl || !releaseNotesEl) return;
 
@@ -212,10 +245,10 @@ if (copyIosLinkBtn) {
   copyIosLinkBtn.addEventListener("click", async () => {
     try {
       await navigator.clipboard.writeText(appLinks.ios);
-      const originalText = copyIosLinkBtn.innerHTML;
-      copyIosLinkBtn.innerHTML = "Copied!";
+      const originalText = copyIosLinkBtn.textContent;
+      copyIosLinkBtn.textContent = "Copied!";
       setTimeout(() => {
-        copyIosLinkBtn.innerHTML = originalText;
+        copyIosLinkBtn.textContent = originalText;
       }, 2000);
     } catch (e) {
       console.error("Failed to copy link:", e);

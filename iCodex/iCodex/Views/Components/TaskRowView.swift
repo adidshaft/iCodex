@@ -24,85 +24,105 @@ struct ThreadRowView: View {
     var themeManager = ThemeManager.shared
 
     var body: some View {
-        HStack(spacing: 12) {
-            // Status indicator column
+        HStack(alignment: .top, spacing: 14) {
             ZStack {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(thread.isRunning ? Color.green.opacity(0.12) : themeManager.current.inputBackground)
+                    .frame(width: 42, height: 42)
+
                 if thread.isRunning {
                     PulsingDot()
                 } else {
                     Image(systemName: thread.sourceIcon)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(themeManager.current.textSecondary)
                 }
             }
-            .frame(width: 20)
 
-            // Main content
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text(thread.title)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+                    .font(.subheadline.weight(.semibold))
                     .lineLimit(2)
                     .foregroundStyle(themeManager.current.textPrimary)
 
                 HStack(spacing: 6) {
                     if let branch = thread.gitBranch {
-                        HStack(spacing: 3) {
-                            Image(systemName: "arrow.triangle.branch")
-                                .font(.system(size: 9))
-                            Text(branch)
-                        }
-                        .lineLimit(1)
+                        threadPill(icon: "arrow.triangle.branch", text: branch)
                     }
-                    Text("·")
-                        .foregroundStyle(themeManager.current.textSecondary.opacity(0.4))
-                    Text(thread.formattedDate)
-                }
-                .font(.caption2)
-                .foregroundStyle(themeManager.current.textSecondary)
 
-                // Git diff stats for completed threads
-                if let stats = thread.gitStats, (stats.insertions > 0 || stats.deletions > 0) {
+                    threadPill(icon: "clock", text: thread.formattedDate)
+                }
+
+                if let stats = thread.gitStats, (stats.insertions > 0 || stats.deletions > 0 || stats.filesChanged > 0) {
                     HStack(spacing: 6) {
                         if stats.insertions > 0 {
-                            Text("+\(stats.insertions)")
-                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                                .foregroundStyle(.green)
+                            statPill(text: "+\(stats.insertions)", color: .green)
                         }
                         if stats.deletions > 0 {
-                            Text("-\(stats.deletions)")
-                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                                .foregroundStyle(.red)
+                            statPill(text: "-\(stats.deletions)", color: .red)
                         }
                         if stats.filesChanged > 0 {
-                            Text("\(stats.filesChanged) files")
-                                .font(.system(size: 10))
-                                .foregroundStyle(themeManager.current.textSecondary)
+                            statPill(text: "\(stats.filesChanged) files", color: themeManager.current.textSecondary)
                         }
                     }
                 }
             }
 
-            Spacer()
+            Spacer(minLength: 12)
 
-            // Right column
-            VStack(alignment: .trailing, spacing: 5) {
+            VStack(alignment: .trailing, spacing: 8) {
                 if thread.isRunning {
                     Text("LIVE")
-                        .font(.system(size: 8, weight: .bold))
+                        .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
                         .background(
                             Capsule()
                                 .fill(Color.green)
                         )
                 }
+
                 Text(thread.formattedTokens)
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(themeManager.current.textSecondary.opacity(0.6))
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    .foregroundStyle(themeManager.current.textSecondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(
+                        Capsule()
+                            .fill(themeManager.current.inputBackground)
+                    )
             }
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, 8)
+    }
+
+    private func threadPill(icon: String, text: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 9, weight: .semibold))
+            Text(text)
+                .lineLimit(1)
+        }
+        .font(.caption2)
+        .foregroundStyle(themeManager.current.textSecondary)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(
+            Capsule()
+                .fill(themeManager.current.inputBackground)
+        )
+    }
+
+    private func statPill(text: String, color: Color) -> some View {
+        Text(text)
+            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+            .foregroundStyle(color)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                Capsule()
+                    .fill(themeManager.current.inputBackground)
+            )
     }
 }

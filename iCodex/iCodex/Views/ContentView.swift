@@ -5,6 +5,9 @@ struct ContentView: View {
     private var themeManager = ThemeManager.shared
     @State private var pairingAlertMessage: String?
     @State private var pairingTask: Task<Void, Never>?
+    @State private var bannerMessage: String?
+    @State private var bannerIsError = false
+    @State private var bannerDismissTask: Task<Void, Never>?
 
     var body: some View {
         Group {
@@ -30,6 +33,33 @@ struct ContentView: View {
                 OnboardingView()
             }
         }
+        .safeAreaInset(edge: .top) {
+            if let bannerMessage {
+                HStack(spacing: 10) {
+                    Image(systemName: bannerIsError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                    Text(bannerMessage)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .multilineTextAlignment(.leading)
+                    Spacer(minLength: 0)
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(bannerIsError ? Color.orange.opacity(0.92) : themeManager.current.accent.opacity(0.95))
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .task(id: config.launchStatusMessage) {
+            guard let message = config.consumeLaunchStatusMessage() else { return }
+            let isError = !config.isAuthenticated
+            await MainActor.run {
+                showBanner(message, isError: isError)
+            }
+        }
         .task(id: config.pendingPairingRequest?.id) {
             guard let request = config.pendingPairingRequest else { return }
             pairingTask?.cancel()
@@ -41,9 +71,7 @@ struct ContentView: View {
                         passcode: request.passcode
                     )
                     await MainActor.run {
-                        config.host = request.host
-                        config.port = request.port
-                        config.apiKey = key
+                        config.applyAuthenticatedSession(host: request.host, port: request.port, apiKey: key)
                         config.pendingPairingRequest = nil
                         pairingAlertMessage = "Paired with \(request.displayHost)."
                     }
@@ -71,6 +99,22 @@ struct ContentView: View {
             }
         } message: {
             Text(pairingAlertMessage ?? "")
+        }
+    }
+
+    private func showBanner(_ message: String, isError: Bool) {
+        bannerDismissTask?.cancel()
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+            bannerMessage = message
+            bannerIsError = isError
+        }
+        bannerDismissTask = Task {
+            try? await Task.sleep(for: .seconds(4))
+            await MainActor.run {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.9)) {
+                    bannerMessage = nil
+                }
+            }
         }
     }
 }

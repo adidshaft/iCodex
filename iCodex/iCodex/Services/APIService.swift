@@ -39,6 +39,7 @@ final class APIService {
         var request = URLRequest(url: url)
         if !apiKey.isEmpty {
             request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+            ServerConfig.shared.recordActivity()
         }
         request.setValue(deviceName, forHTTPHeaderField: "X-Device-Name")
         return request
@@ -51,6 +52,7 @@ final class APIService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if !apiKey.isEmpty {
             request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+            ServerConfig.shared.recordActivity()
         }
         request.setValue(deviceName, forHTTPHeaderField: "X-Device-Name")
         return request
