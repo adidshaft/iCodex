@@ -257,6 +257,14 @@ func postNamedAction(_ action: String) -> Bool {
         postKeystroke(keyCode: 123)
     case "right":
         postKeystroke(keyCode: 124)
+    case "page_up":
+        postKeystroke(keyCode: 116)
+    case "page_down":
+        postKeystroke(keyCode: 121)
+    case "jump_top":
+        postKeystroke(keyCode: 126, flags: .maskCommand)
+    case "jump_bottom":
+        postKeystroke(keyCode: 125, flags: .maskCommand)
     default:
         return false
     }
@@ -631,7 +639,7 @@ case "paste_enter":
 
 case "key":
     guard args.count >= 3 else {
-        fputs("usage: icodex_keystroke key <enter|tab|shift_tab|space|escape|up|down|left|right>\n", stderr)
+        fputs("usage: icodex_keystroke key <enter|tab|shift_tab|space|escape|up|down|left|right|page_up|page_down|jump_top|jump_bottom>\n", stderr)
         exit(1)
     }
     if postNamedAction(args[2]) {

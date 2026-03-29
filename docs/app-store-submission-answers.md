@@ -18,9 +18,48 @@ Suggested short description:
 
 `iCodex lets you monitor and control Codex running on your own Mac. Pair your iPhone or iPad with the iCodex-Connect companion app on your Mac, then view threads, send replies, and manage work from anywhere on your local network.`
 
-## App Review notes
+### Guideline 2.1 Rejection Response (March 2026)
 
-Paste this into the App Review notes field:
+Provide these answers in the **App Review Information** section / **Notes** field in App Store Connect:
+
+**1. Screen Recording**
+*   *Note to developer:* You must attach a video to your submission. 
+*   **Steps for recording:**
+    1.  Launch iCodex on your iPhone.
+    2.  Show the "Local Network" permission prompt (if it's the first run).
+    3.  Navigate to the **Settings** tab.
+    4.  Demonstrate pairing with your Mac by entering the IP/Port (or using the discovery feature).
+    5.  Return to the **Dashboard** to show the connection status is "Online".
+    6.  Create a "New Task" (e.g., prompt: "Write a hello world in Python").
+    7.  Go to the **Task Detail** view to show real-time logs streaming.
+    8.  Tap **Cancel** to show task interruption.
+    9.  Navigate back to show the updated task status.
+
+**2. App Purpose**
+iCodex is a remote companion for the "Codex" CLI developer tool running locally on a user’s Mac. It allows developers to monitor, control, and interact with long-running AI-driven code generation and analysis tasks from their iOS device. It solves the problem of needing to stay at the computer to monitor progress or respond to prompts during long workflows.
+
+**3. Instructions for Access**
+The app operates strictly on the user’s local network and does not require a public user account.
+*   **Setup:** The user should install and run the `menubar_app.py` (found in the `MacBackend` directory of the companion source) on a Mac. (available at: https://icodex.kyokasuigetsu.xyz/)
+*   **Pairing:** When the Mac backend is running, it will display a local IP and port. In the iOS app, navigate to **Settings**, enter these details, and tap **Test Connection**. 
+*   **Reviewing Features:** Once connected, use the **New Task** screen to start a process. You can monitor the output in real-time on the **Task Detail** screen.
+
+**4. External Services**
+*   **Local Network:** Used for peer-to-peer discovery and communication between the iOS app and the host Mac.
+*   **Codex CLI:** The app interfaces with the Codex CLI tool installed on the user host. While the CLI tool may utilize AI models (e.g., OpenAI), the iOS app communicates *only* with the local Mac backend and does not call any third-party AI APIs directly.
+*   **No Third-Party SDKs:** The app uses no third-party analytics, tracking, or authentication services.
+
+**5. Regional Differences**
+Confirming that the app functions consistently across all regions with no variations in features or content.
+
+**6. Highly Regulated Industry**
+The app is a general-purpose developer productivity utility and does not operate in a highly regulated industry.
+
+---
+
+## App Review notes (Legacy)
+
+Paste this into the App Review notes field if the above structured format is not required:
 
 `iCodex is a companion app for software running on the user’s own Mac. To use the app, the reviewer should install and open the iCodex-Connect macOS companion on a Mac, keep the Mac and iOS device on the same local network, and pair using the one-time 6-digit passcode shown by the Mac menu bar app. The iOS app uses Local Network access only to discover and communicate directly with the reviewer’s own Mac. No public user account is required. The Mac companion requests Accessibility permission because it controls the locally installed Codex desktop app on the reviewer’s Mac. A short demo video showing setup, pairing, and normal use should be attached to the review submission.`
 

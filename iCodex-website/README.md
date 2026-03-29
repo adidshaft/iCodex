@@ -22,7 +22,7 @@ npm run build
 
 ## Update links
 
-Edit `/Users/amanpandey/Desktop/iCodex/iCodex-website/src/main.js`:
+Edit `src/main.js`:
 
 - `appLinks.ios` for the final App Store listing URL
 - `appLinks.dmg` for the DMG download
@@ -45,5 +45,5 @@ The support page posts to a shared Supabase project through:
 
 The iCodex-owned deployment source now lives in:
 
-- `/Users/amanpandey/Desktop/iCodex/supabase-feedback/supabase/functions/icodex-feedback/index.ts`
-- `/Users/amanpandey/Desktop/iCodex/supabase-feedback/supabase/migrations/20260316000100_create_icodex_feedback_submissions.sql`
+- `../supabase-feedback/supabase/functions/icodex-feedback/index.ts`
+- `../supabase-feedback/supabase/migrations/20260316000100_create_icodex_feedback_submissions.sql`

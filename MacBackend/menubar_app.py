@@ -12,6 +12,7 @@ import sys
 import time as _time
 import urllib.request
 from pathlib import Path
+from urllib.parse import urlencode
 
 import rumps
 
@@ -147,6 +148,39 @@ def _copy(text: str) -> None:
         subprocess.run(["pbcopy"], input=text.encode(), check=True, timeout=5)
     except Exception:
         pass
+
+
+def _build_pairing_url(host: str, port: int, passcode: str) -> str:
+    query = urlencode({
+        "host": host,
+        "port": str(port),
+        "passcode": passcode,
+    })
+    return f"icodex://pair?{query}"
+
+
+def _generate_qr_image(payload: str, scale: float = 10.0):
+    try:
+        import Quartz
+        from AppKit import NSImage, NSZeroSize
+        from Foundation import NSData
+
+        data = payload.encode("utf-8")
+        ns_data = NSData.dataWithBytes_length_(data, len(data))
+        qr_filter = Quartz.CIFilter.filterWithName_("CIQRCodeGenerator")
+        qr_filter.setDefaults()
+        qr_filter.setValue_forKey_(ns_data, "inputMessage")
+        qr_filter.setValue_forKey_("M", "inputCorrectionLevel")
+
+        image = qr_filter.outputImage()
+        transform = Quartz.CGAffineTransformMakeScale(scale, scale)
+        scaled = image.imageByApplyingTransform_(transform)
+
+        context = Quartz.CIContext.contextWithOptions_(None)
+        cg_image = context.createCGImage_fromRect_(scaled, scaled.extent())
+        return NSImage.alloc().initWithCGImage_size_(cg_image, NSZeroSize)
+    except Exception:
+        return None
 
 
 def _server_get(path: str) -> object:
@@ -355,6 +389,10 @@ class ICodexMenuBarApp(rumps.App):
         self._server_proc: subprocess.Popen | None = None
         self._devices: list[dict] = []
         self._shutdown_handled = False
+        self._pairing_qr_window = None
+        self._pairing_qr_image_view = None
+        self._pairing_qr_hint_label = None
+        self._pairing_qr_detail_label = None
 
         # ── Menu items ────────────────────────────────────────────────────
         self.status_item = rumps.MenuItem("Server: Starting…")
@@ -375,6 +413,11 @@ class ICodexMenuBarApp(rumps.App):
             callback=self.on_copy_passcode,
         )
 
+        self.qr_item = rumps.MenuItem(
+            "  Show Pairing QR Code",
+            callback=self.on_show_pairing_qr,
+        )
+
         self.devices_menu = rumps.MenuItem("Devices (0)")
         # Don't call _rebuild_devices_menu() here — NSMenu isn't created until run()
 
@@ -392,6 +435,7 @@ class ICodexMenuBarApp(rumps.App):
             None,
             self.url_item,
             self.passcode_item,
+            self.qr_item,
             None,
             self.a11y_item,
             self.devices_menu,
@@ -486,6 +530,14 @@ class ICodexMenuBarApp(rumps.App):
 
         self.url_item.title = f"  http://{local_ip}:{PORT}  ⧉"
         self.passcode_item.title = f"  Passcode: {passcode}  ⧉"
+        self.qr_item.title = "  Show Pairing QR Code"
+
+        if self._pairing_qr_window is not None:
+            try:
+                if self._pairing_qr_window.isVisible():
+                    self._update_pairing_qr_window(local_ip, passcode)
+            except Exception:
+                pass
 
         # ── Accessibility status (cached, re-check every 30s) ────────────
         now = _time.time()
@@ -635,6 +687,119 @@ class ICodexMenuBarApp(rumps.App):
         passcode = _read_passcode()
         _copy(passcode)
         rumps.notification("iCodex", "Copied", f"Passcode: {passcode}")
+
+    def _make_qr_label(self, text: str, frame):
+        from AppKit import NSColor, NSFont, NSTextAlignmentCenter, NSTextField
+
+        label = NSTextField.labelWithString_(text)
+        label.setFrame_(frame)
+        label.setAlignment_(NSTextAlignmentCenter)
+        label.setTextColor_(NSColor.labelColor())
+        label.setFont_(NSFont.systemFontOfSize_(13))
+        return label
+
+    def _ensure_pairing_qr_window(self):
+        if self._pairing_qr_window is not None:
+            return
+
+        from AppKit import (
+            NSApplication,
+            NSBackingStoreBuffered,
+            NSFont,
+            NSImageView,
+            NSTextAlignmentCenter,
+            NSTextField,
+            NSWindow,
+            NSWindowStyleMaskClosable,
+            NSWindowStyleMaskTitled,
+        )
+        from Foundation import NSMakeRect
+
+        window = NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
+            NSMakeRect(0, 0, 360, 420),
+            NSWindowStyleMaskTitled | NSWindowStyleMaskClosable,
+            NSBackingStoreBuffered,
+            False,
+        )
+        window.setTitle_("Pair iPhone")
+        window.setReleasedWhenClosed_(False)
+        window.center()
+
+        content = window.contentView()
+
+        title = NSTextField.labelWithString_("Scan this QR with Camera or iCodex")
+        title.setFrame_(NSMakeRect(26, 378, 308, 24))
+        title.setAlignment_(NSTextAlignmentCenter)
+        title.setFont_(NSFont.boldSystemFontOfSize_(17))
+        content.addSubview_(title)
+
+        image_view = NSImageView.alloc().initWithFrame_(NSMakeRect(70, 132, 220, 220))
+        content.addSubview_(image_view)
+
+        hint_label = self._make_qr_label("", NSMakeRect(26, 90, 308, 26))
+        content.addSubview_(hint_label)
+
+        detail_label = self._make_qr_label("", NSMakeRect(26, 56, 308, 22))
+        detail_label.setFont_(NSFont.monospacedSystemFontOfSize_weight_(12, 0))
+        content.addSubview_(detail_label)
+
+        footnote = self._make_qr_label(
+            "The QR fills in your Mac IP, port, and passcode automatically.",
+            NSMakeRect(26, 20, 308, 30),
+        )
+        footnote.setLineBreakMode_(0)
+        footnote.setUsesSingleLineMode_(False)
+        footnote.setMaximumNumberOfLines_(2)
+        content.addSubview_(footnote)
+
+        self._pairing_qr_window = window
+        self._pairing_qr_image_view = image_view
+        self._pairing_qr_hint_label = hint_label
+        self._pairing_qr_detail_label = detail_label
+
+        NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
+
+    def _update_pairing_qr_window(self, local_ip: str, passcode: str):
+        if not local_ip or local_ip == "127.0.0.1" or not passcode.isdigit():
+            return
+
+        self._ensure_pairing_qr_window()
+        pairing_url = _build_pairing_url(local_ip, PORT, passcode)
+        image = _generate_qr_image(pairing_url)
+        if image is None:
+            rumps.notification(
+                "iCodex",
+                "QR Code Unavailable",
+                "Could not generate the pairing QR code on this Mac.",
+            )
+            return
+
+        self._pairing_qr_image_view.setImage_(image)
+        self._pairing_qr_hint_label.setStringValue_(f"Mac: {local_ip}:{PORT}")
+        self._pairing_qr_detail_label.setStringValue_(f"Passcode: {passcode}")
+
+    def on_show_pairing_qr(self, _sender):
+        local_ip = _get_local_ip()
+        passcode = _read_passcode()
+
+        if local_ip == "127.0.0.1":
+            rumps.notification(
+                "iCodex",
+                "QR Code Unavailable",
+                "Connect your Mac to Wi-Fi so iCodex can generate a pairing QR code.",
+            )
+            return
+
+        if not passcode.isdigit():
+            rumps.notification(
+                "iCodex",
+                "QR Code Unavailable",
+                "The current setup passcode is not ready yet.",
+            )
+            return
+
+        self._update_pairing_qr_window(local_ip, passcode)
+        self._pairing_qr_window.makeKeyAndOrderFront_(None)
 
     def on_open_accessibility(self, _sender):
         if _check_accessibility():

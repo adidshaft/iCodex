@@ -507,20 +507,66 @@ def perform_gui_action(thread_id: str, action: str) -> dict:
 
 def get_thread_gui_controls(thread_id: str) -> dict:
     """Return the currently mirrored GUI controls for a Codex desktop thread."""
+    remote_status = codex_gui.get_remote_status()
+    session_state = remote_status.get("session_state", {})
+    codex_running = remote_status.get("codex_running", False)
+    supported_actions = remote_status.get("supported_actions", [])
+
     proc = _running_processes.get(thread_id)
     if proc and proc.returncode is None:
         return {
             "status": "process_running",
             "error": "This thread is running as a managed CLI task. GUI choices are only available for the Codex desktop app.",
+            "controls": [],
+            "session_state": session_state,
+            "codex_running": codex_running,
+            "remote_ready": False,
+            "supported_actions": supported_actions,
         }
 
     thread = get_thread(thread_id)
     if not thread:
-        return {"status": "not_found"}
+        return {
+            "status": "not_found",
+            "controls": [],
+            "session_state": session_state,
+            "codex_running": codex_running,
+            "remote_ready": False,
+            "supported_actions": supported_actions,
+        }
     if not _thread_prefers_gui(thread):
-        return {"status": "gui_unavailable", "error": "This thread is not backed by the Codex desktop GUI."}
-    if not codex_gui.is_gui_running():
-        return {"status": "gui_unavailable", "error": "Codex desktop app is not running."}
+        return {
+            "status": "gui_unavailable",
+            "error": "This thread is not backed by the Codex desktop GUI.",
+            "controls": [],
+            "session_state": session_state,
+            "codex_running": codex_running,
+            "remote_ready": False,
+            "supported_actions": supported_actions,
+        }
+    if not codex_running:
+        return {
+            "status": "gui_unavailable",
+            "error": "Codex desktop app is not running.",
+            "controls": [],
+            "session_state": session_state,
+            "codex_running": codex_running,
+            "remote_ready": False,
+            "supported_actions": supported_actions,
+        }
+    if not session_state.get("available", True):
+        return {
+            "status": "locked",
+            "error": (
+                "Mac is locked or the screen is not currently interactive. "
+                "Unlock the session on the Mac to continue remote control."
+            ),
+            "controls": [],
+            "session_state": session_state,
+            "codex_running": codex_running,
+            "remote_ready": False,
+            "supported_actions": supported_actions,
+        }
 
     result = codex_gui.list_controls(thread_id=thread_id)
     if result["success"]:
@@ -528,8 +574,20 @@ def get_thread_gui_controls(thread_id: str) -> dict:
             "status": "available",
             "method": "gui",
             "controls": result.get("controls", []),
+            "session_state": session_state,
+            "codex_running": codex_running,
+            "remote_ready": True,
+            "supported_actions": supported_actions,
         }
-    return {"status": "gui_error", "error": result.get("error", "")}
+    return {
+        "status": "gui_error",
+        "error": result.get("error", ""),
+        "controls": [],
+        "session_state": session_state,
+        "codex_running": codex_running,
+        "remote_ready": False,
+        "supported_actions": supported_actions,
+    }
 
 
 def press_thread_gui_control(thread_id: str, control_id: str) -> dict:

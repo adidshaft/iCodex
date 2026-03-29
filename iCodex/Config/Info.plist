@@ -12,6 +12,19 @@
 	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.icodex.pairing</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>icodex</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
@@ -31,6 +44,8 @@
 	<array>
 		<string>_icodex._tcp</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>iCodex uses the camera to scan the pairing QR code shown by iCodex-Connect on your Mac.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>iCodex uses your local network to find and connect to your Mac so you can manage Codex remotely from your iPhone or iPad.</string>
 	<key>UIApplicationSceneManifest</key>

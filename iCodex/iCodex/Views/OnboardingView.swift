@@ -12,6 +12,7 @@ struct OnboardingView: View {
     @State private var isAuthenticating = false
     @State private var detectedSubnet: String?
     @State private var scanTask: Task<Void, Never>?
+    @State private var isShowingQRScanner = false
 
     private static let maxConcurrentProbes = 50
     private static let probeTimeout: TimeInterval = 2.0
@@ -62,7 +63,7 @@ struct OnboardingView: View {
                     // Hero/Logo
                     heroSection
                         .padding(.top, 56)
-                        .padding(.bottom, 40)
+                        .padding(.bottom, 28)
 
                     // Step content card
                     Group {
@@ -103,37 +104,45 @@ struct OnboardingView: View {
                 }
             }
         }
+        .sheet(isPresented: $isShowingQRScanner) {
+            PairingQRCodeScannerSheet(
+                onScannedCode: handleScannedPairingCode,
+                onScannerError: { message in
+                    authError = message
+                }
+            )
+        }
     }
 
     // MARK: - Hero Section
 
     private var heroSection: some View {
-        VStack(spacing: 18) {
+        HStack(spacing: 16) {
             ZStack {
                 Circle()
                     .fill(
                         RadialGradient(
                             colors: [Color.white.opacity(0.07), Color.clear],
                             center: .center,
-                            startRadius: 30,
-                            endRadius: 80
+                            startRadius: 18,
+                            endRadius: 48
                         )
                     )
-                    .frame(width: 160, height: 160)
+                    .frame(width: 96, height: 96)
 
                 Image("AppLogo")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 96, height: 96)
-                    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    .frame(width: 64, height: 64)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .shadow(color: Color.black.opacity(0.5), radius: 20, x: 0, y: 8)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .stroke(Color.white.opacity(0.14), lineWidth: 1)
                     )
             }
 
-            VStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text("iCodex")
                     .font(.system(size: 34, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
@@ -143,6 +152,8 @@ struct OnboardingView: View {
                     .foregroundStyle(Color.white.opacity(0.45))
             }
         }
+        .frame(maxWidth: .infinity, alignment: .center)
+        .padding(.horizontal, 24)
     }
 
     // MARK: - Prerequisites
@@ -203,24 +214,48 @@ struct OnboardingView: View {
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
 
             // CTA
-            Button {
-                withAnimation { step = .scanning }
-                startScan()
-            } label: {
-                HStack(spacing: 8) {
-                    Text("Find My Server")
-                        .fontWeight(.semibold)
-                    Image(systemName: "arrow.right")
+            VStack(spacing: 12) {
+                Button {
+                    isShowingQRScanner = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "qrcode.viewfinder")
+                        Text("Scan Pairing QR")
+                            .fontWeight(.semibold)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color(red: 0.22, green: 0.47, blue: 0.96))
+                    )
+                    .foregroundStyle(.white)
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color(red: 0.22, green: 0.47, blue: 0.96))
-                )
-                .foregroundStyle(.white)
+                .buttonStyle(.plain)
+
+                Button {
+                    withAnimation { step = .scanning }
+                    startScan()
+                } label: {
+                    HStack(spacing: 8) {
+                        Text("Find My Server")
+                            .fontWeight(.semibold)
+                        Image(systemName: "arrow.right")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color.white.opacity(0.08))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                            )
+                    )
+                    .foregroundStyle(.white)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
             .padding(.top, 20)
         }
     }
@@ -327,6 +362,24 @@ struct OnboardingView: View {
             }
 
             VStack(spacing: 12) {
+                Button {
+                    isShowingQRScanner = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "qrcode.viewfinder")
+                        Text("Scan Pairing QR")
+                            .fontWeight(.semibold)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color(red: 0.22, green: 0.47, blue: 0.96))
+                    )
+                    .foregroundStyle(.white)
+                }
+                .buttonStyle(.plain)
+
                 Button {
                     withAnimation { step = .scanning }
                     startScan()
@@ -443,11 +496,33 @@ struct OnboardingView: View {
                 Text("Connect to Server")
                     .font(.headline)
                     .foregroundStyle(.white)
-                Text("Enter your Mac's IP and the 6-digit passcode from the iCodex-Connect menu bar.")
+                Text("Scan the pairing QR from your Mac, or enter your Mac's IP and the 6-digit passcode manually.")
                     .font(.caption)
                     .foregroundStyle(Color.white.opacity(0.45))
                     .multilineTextAlignment(.center)
             }
+
+            Button {
+                isShowingQRScanner = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "qrcode.viewfinder")
+                    Text("Scan Pairing QR")
+                        .fontWeight(.semibold)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color.white.opacity(0.08))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                        )
+                )
+                .foregroundStyle(.white)
+            }
+            .buttonStyle(.plain)
 
             // Fields card
             VStack(spacing: 16) {
@@ -763,8 +838,13 @@ struct OnboardingView: View {
 
         Task {
             do {
-                let key = try await APIService.shared.setupAuth(passcode: passcodeInput)
+                let key = try await APIService.shared.setupAuth(
+                    host: trimmedIP,
+                    port: config.port,
+                    passcode: passcodeInput
+                )
                 await MainActor.run {
+                    config.host = trimmedIP
                     config.apiKey = key
                     isAuthenticating = false
                     step = .done
@@ -787,6 +867,54 @@ struct OnboardingView: View {
                     isAuthenticating = false
                     authError = "Invalid passcode or connection failed. Check the code on your Mac."
                     passcodeInput = ""
+                }
+            }
+        }
+    }
+
+    private func handleScannedPairingCode(_ code: String) {
+        guard let request = PairingRequest.from(scannedValue: code) else {
+            authError = "That QR code is not a valid iCodex pairing code."
+            return
+        }
+
+        manualIP = request.host
+        config.host = request.host
+        config.port = request.port
+        passcodeInput = request.passcode
+        authError = nil
+
+        if step != .authenticate {
+            withAnimation { step = .authenticate }
+        }
+
+        authenticateScannedPairing(request)
+    }
+
+    private func authenticateScannedPairing(_ request: PairingRequest) {
+        guard !isAuthenticating else { return }
+
+        isAuthenticating = true
+        authError = nil
+
+        Task {
+            do {
+                let key = try await APIService.shared.setupAuth(
+                    host: request.host,
+                    port: request.port,
+                    passcode: request.passcode
+                )
+                await MainActor.run {
+                    config.host = request.host
+                    config.port = request.port
+                    config.apiKey = key
+                    isAuthenticating = false
+                    step = .done
+                }
+            } catch {
+                await MainActor.run {
+                    isAuthenticating = false
+                    authError = "Could not pair from the QR code. Make sure iCodex-Connect is running on your Mac."
                 }
             }
         }

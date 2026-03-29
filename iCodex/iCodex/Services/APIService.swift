@@ -75,7 +75,11 @@ final class APIService {
 
     /// Exchange a 6-digit setup passcode for the API key.
     func setupAuth(passcode: String) async throws -> String {
-        let url = URL(string: "\(baseURL)/auth/setup")!
+        try await setupAuth(host: ServerConfig.shared.host, port: ServerConfig.shared.port, passcode: passcode)
+    }
+
+    func setupAuth(host: String, port: Int, passcode: String) async throws -> String {
+        let url = URL(string: "http://\(host):\(port)/auth/setup")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -223,6 +227,18 @@ final class APIService {
         let status: String
         let message: String?
         let controls: [GUIControlOption]?
+        let sessionState: GUIRemoteSession?
+        let codexRunning: Bool?
+        let remoteReady: Bool?
+        let supportedActions: [String]?
+
+        enum CodingKeys: String, CodingKey {
+            case status, message, controls
+            case sessionState = "session_state"
+            case codexRunning = "codex_running"
+            case remoteReady = "remote_ready"
+            case supportedActions = "supported_actions"
+        }
     }
 
     func stopThread(_ threadId: String) async throws -> ActionResponse {

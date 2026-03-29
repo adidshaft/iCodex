@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var passcodeInput: String = ""
     @State private var authStatus: AuthStatus = .idle
     @State private var isVerifyingAuth = false
+    @State private var isShowingQRScanner = false
 
     struct DiscoveredServer: Identifiable {
         let id = UUID()
@@ -218,6 +219,14 @@ struct SettingsView: View {
                         }
                     } else {
                         VStack(alignment: .leading, spacing: 8) {
+                            Button {
+                                isShowingQRScanner = true
+                            } label: {
+                                Label("Scan Pairing QR", systemImage: "qrcode.viewfinder")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+
                             Text("Enter the 6-digit passcode from the iCodex-Connect menu bar on your Mac:")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -397,6 +406,14 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            .sheet(isPresented: $isShowingQRScanner) {
+                PairingQRCodeScannerSheet(
+                    onScannedCode: handleScannedPairingCode,
+                    onScannerError: { message in
+                        authStatus = .error(message)
+                    }
+                )
+            }
         }
     }
 
@@ -406,7 +423,11 @@ struct SettingsView: View {
         authStatus = .connecting
         Task {
             do {
-                let key = try await APIService.shared.setupAuth(passcode: passcodeInput)
+                let key = try await APIService.shared.setupAuth(
+                    host: config.host.trimmingCharacters(in: .whitespacesAndNewlines),
+                    port: config.port,
+                    passcode: passcodeInput
+                )
                 await MainActor.run {
                     config.apiKey = key
                     authStatus = .success("Paired successfully!")
@@ -424,6 +445,39 @@ struct SettingsView: View {
             } catch {
                 await MainActor.run {
                     authStatus = .error(error.localizedDescription)
+                }
+            }
+        }
+    }
+
+    private func handleScannedPairingCode(_ code: String) {
+        guard let request = PairingRequest.from(scannedValue: code) else {
+            authStatus = .error("That QR code is not a valid iCodex pairing code.")
+            return
+        }
+
+        config.host = request.host
+        config.port = request.port
+        passcodeInput = request.passcode
+        authStatus = .connecting
+
+        Task {
+            do {
+                let key = try await APIService.shared.setupAuth(
+                    host: request.host,
+                    port: request.port,
+                    passcode: request.passcode
+                )
+                await MainActor.run {
+                    config.host = request.host
+                    config.port = request.port
+                    config.apiKey = key
+                    authStatus = .success("Paired with \(request.displayHost).")
+                    passcodeInput = ""
+                }
+            } catch {
+                await MainActor.run {
+                    authStatus = .error("Could not pair from the QR code. Make sure iCodex-Connect is running on your Mac.")
                 }
             }
         }

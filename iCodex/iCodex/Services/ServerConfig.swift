@@ -4,6 +4,7 @@ import Combine
 final class ServerConfig: ObservableObject {
     static let shared = ServerConfig()
 
+    @Published var pendingPairingRequest: PairingRequest?
     @Published var host: String {
         didSet { UserDefaults.standard.set(host, forKey: "server_host") }
     }
@@ -33,5 +34,18 @@ final class ServerConfig: ObservableObject {
 
     func clearAuth() {
         apiKey = ""
+    }
+
+    func queuePairingRequest(_ request: PairingRequest) {
+        pendingPairingRequest = request
+    }
+
+    @discardableResult
+    func handlePairingURL(_ url: URL) -> Bool {
+        guard let request = PairingRequest.from(url: url) else {
+            return false
+        }
+        queuePairingRequest(request)
+        return true
     }
 }

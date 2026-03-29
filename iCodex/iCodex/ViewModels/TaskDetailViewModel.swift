@@ -13,6 +13,11 @@ final class ThreadDetailViewModel: ObservableObject {
     @Published var isRunning = false
     @Published var statusMessage: String?
     @Published var mirroredControls: [GUIControlOption] = []
+    @Published var remoteSession: GUIRemoteSession?
+    @Published var remoteAvailabilityMessage: String?
+    @Published var isCodexGUIAvailable = false
+    @Published var remoteReady = false
+    @Published var supportedRemoteActions: [String] = []
 
     // Model switching
     @Published var availableModels: [CodexModel] = []
@@ -23,6 +28,7 @@ final class ThreadDetailViewModel: ObservableObject {
     let wsService = WebSocketService()
     private var cancellables = Set<AnyCancellable>()
     private var controlsPollTask: Task<Void, Never>?
+    private var isSceneActive = true
 
     init(threadId: String) {
         self.threadId = threadId
@@ -32,9 +38,64 @@ final class ThreadDetailViewModel: ObservableObject {
         messages.filter { $0.isUser || $0.isAssistant }
     }
 
+    var supportsRemoteCompanion: Bool {
+        detail?.source == "vscode"
+    }
+
+    var shouldShowRemoteCompanion: Bool {
+        supportsRemoteCompanion
+    }
+
+    var remoteStatusTitle: String {
+        if !supportsRemoteCompanion {
+            return "Remote unavailable"
+        }
+        if remoteReady {
+            return isRunning ? "Codex live" : "Remote ready"
+        }
+        if remoteSession?.locked == true {
+            return "Mac locked"
+        }
+        if !isCodexGUIAvailable {
+            return "Codex closed"
+        }
+        return "Checking Mac"
+    }
+
+    var remoteStatusSubtitle: String {
+        if let message = remoteAvailabilityMessage, !message.isEmpty {
+            return message
+        }
+        if remoteReady {
+            return isRunning
+                ? "Use controls, mirrored choices, or send a follow-up while Codex runs."
+                : "Navigate this Codex thread remotely and keep the handoff ready."
+        }
+        if remoteSession?.screensaverRunning == true {
+            return "The screen saver is active. Wake or unlock the Mac session to continue control."
+        }
+        return "Connect to the Codex desktop thread to enable remote actions."
+    }
+
+    var remoteStatusSymbol: String {
+        if remoteReady { return "dot.radiowaves.left.and.right" }
+        if remoteSession?.locked == true { return "lock.fill" }
+        if !isCodexGUIAvailable { return "macbook.and.iphone" }
+        return "clock.arrow.circlepath"
+    }
+
+    func supportsRemoteAction(_ action: String) -> Bool {
+        supportedRemoteActions.isEmpty || supportedRemoteActions.contains(action)
+    }
+
     func load() {
         isLoading = true
         errorMessage = nil
+
+        wsService.disconnect()
+        cancellables.removeAll()
+        controlsPollTask?.cancel()
+        controlsPollTask = nil
 
         // Connect WebSocket for real-time updates
         wsService.connectThread(threadId: threadId)
@@ -73,7 +134,8 @@ final class ThreadDetailViewModel: ObservableObject {
                 self.isRunning = d.isRunning
                 self.availableModels = models
                 self.currentConfig = config
-                self.startMirroredControlsPolling()
+                self.startRemotePolling()
+                await self.refreshRemoteState(force: true)
             } catch {
                 self.errorMessage = error.localizedDescription
             }
@@ -109,6 +171,7 @@ final class ThreadDetailViewModel: ObservableObject {
                 self.errorMessage = "Failed to send: \(error.localizedDescription)"
             }
             self.isSending = false
+            await self.refreshRemoteState(force: true)
         }
     }
 
@@ -131,6 +194,7 @@ final class ThreadDetailViewModel: ObservableObject {
             } catch {
                 self.errorMessage = "Failed to stop: \(error.localizedDescription)"
             }
+            await self.refreshRemoteState(force: true)
         }
     }
 
@@ -151,6 +215,7 @@ final class ThreadDetailViewModel: ObservableObject {
             } catch {
                 self.errorMessage = "Failed to interrupt: \(error.localizedDescription)"
             }
+            await self.refreshRemoteState(force: true)
         }
     }
 
@@ -174,7 +239,7 @@ final class ThreadDetailViewModel: ObservableObject {
                 self.errorMessage = "Failed to send control: \(error.localizedDescription)"
             }
             self.isSendingGUIAction = false
-            await self.refreshMirroredControls()
+            await self.refreshRemoteState(force: true)
         }
     }
 
@@ -195,7 +260,7 @@ final class ThreadDetailViewModel: ObservableObject {
                 self.errorMessage = "Failed to select option: \(error.localizedDescription)"
             }
             self.isSendingGUIAction = false
-            await self.refreshMirroredControls()
+            await self.refreshRemoteState(force: true)
         }
     }
 
@@ -227,7 +292,16 @@ final class ThreadDetailViewModel: ObservableObject {
             if let msgs = try? await APIService.shared.fetchThreadMessages(threadId) {
                 self.messages = msgs
             }
-            await self.refreshMirroredControls()
+            await self.refreshRemoteState(force: true)
+        }
+    }
+
+    func setSceneActive(_ active: Bool) {
+        isSceneActive = active
+        if active {
+            Task {
+                await refreshRemoteState(force: true)
+            }
         }
     }
 
@@ -247,48 +321,67 @@ final class ThreadDetailViewModel: ObservableObject {
         }
     }
 
-    private func startMirroredControlsPolling() {
+    private func startRemotePolling() {
         controlsPollTask?.cancel()
         controlsPollTask = Task { [weak self] in
             guard let self = self else { return }
             while !Task.isCancelled {
-                await self.refreshMirroredControls()
-                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                if self.isSceneActive {
+                    await self.refreshRemoteState()
+                }
+
+                let interval: UInt64
+                if !self.supportsRemoteCompanion {
+                    interval = 5_000_000_000
+                } else if !self.isSceneActive {
+                    interval = 4_000_000_000
+                } else if self.isRunning {
+                    interval = 1_250_000_000
+                } else {
+                    interval = 2_750_000_000
+                }
+                try? await Task.sleep(nanoseconds: interval)
             }
         }
     }
 
-    private func refreshMirroredControls() async {
-        guard detail?.source == "vscode" else {
-            if !mirroredControls.isEmpty {
-                mirroredControls = []
-            }
+    private func clearRemoteState(message: String? = nil) {
+        if !mirroredControls.isEmpty {
+            mirroredControls = []
+        }
+        remoteSession = nil
+        remoteAvailabilityMessage = message
+        isCodexGUIAvailable = false
+        remoteReady = false
+        supportedRemoteActions = []
+    }
+
+    private func refreshRemoteState(force: Bool = false) async {
+        guard supportsRemoteCompanion else {
+            clearRemoteState()
             return
         }
 
         // Avoid refocusing the Mac thread while we're actively sending text or
-        // pressing a GUI action from iPhone.
-        guard !isSending, !isSendingGUIAction else {
-            return
-        }
-
-        guard isRunning else {
-            if !mirroredControls.isEmpty {
-                mirroredControls = []
-            }
+        // pressing a GUI action from iPhone unless we explicitly need a refresh.
+        guard force || (!isSending && !isSendingGUIAction) else {
             return
         }
 
         do {
             let response = try await APIService.shared.fetchGUIControls(threadId)
+            remoteSession = response.sessionState
+            remoteAvailabilityMessage = response.message
+            isCodexGUIAvailable = response.codexRunning ?? false
+            remoteReady = response.remoteReady ?? false
+            supportedRemoteActions = response.supportedActions ?? []
+
             let controls = (response.controls ?? []).filter { !$0.title.isEmpty }
             if controls != mirroredControls {
                 mirroredControls = controls
             }
         } catch {
-            if !mirroredControls.isEmpty {
-                mirroredControls = []
-            }
+            clearRemoteState(message: "Could not reach the Mac helper.")
         }
     }
 }

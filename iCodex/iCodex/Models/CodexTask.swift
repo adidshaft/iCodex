@@ -187,3 +187,19 @@ struct GUIControlOption: Codable, Identifiable, Equatable {
     let selected: Bool
     let focused: Bool
 }
+
+struct GUIRemoteSession: Codable, Equatable {
+    let locked: Bool
+    let onConsole: Bool
+    let loginDone: Bool
+    let screensaverRunning: Bool
+    let available: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case locked
+        case onConsole = "on_console"
+        case loginDone = "login_done"
+        case screensaverRunning = "screensaver_running"
+        case available
+    }
+}

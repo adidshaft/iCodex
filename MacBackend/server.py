@@ -563,6 +563,8 @@ async def thread_gui_controls(thread_id: str, _token: str = Depends(require_auth
     status = result.get("status")
     if status == "available":
         result["message"] = "Fetched GUI choices."
+    elif status == "locked":
+        result["message"] = result.get("error", "Mac is locked, so GUI control is unavailable.")
     elif status == "process_running":
         result["message"] = result.get("error", "GUI choices are only available for Codex desktop threads.")
     elif status == "gui_unavailable":

@@ -68,7 +68,7 @@ def _find_helper() -> str | None:
 
 _HELPER = _find_helper()
 
-GUI_KEY_ACTIONS = {
+SUPPORTED_GUI_ACTIONS = (
     "enter",
     "tab",
     "shift_tab",
@@ -78,7 +78,13 @@ GUI_KEY_ACTIONS = {
     "down",
     "left",
     "right",
-}
+    "page_up",
+    "page_down",
+    "jump_top",
+    "jump_bottom",
+)
+
+GUI_KEY_ACTIONS = set(SUPPORTED_GUI_ACTIONS)
 
 if _HELPER:
     logger.info("Native keystroke helper: %s", _HELPER)
@@ -182,6 +188,19 @@ def get_session_state() -> dict:
     state["locked"] = bool(state["locked"]) or not bool(state["on_console"]) or not bool(state["login_done"])
     state["available"] = not state["locked"]
     return state
+
+
+def get_remote_status() -> dict:
+    """Return a lightweight snapshot of GUI remote-control availability."""
+    session_state = get_session_state()
+    codex_running = is_gui_running()
+    return {
+        "success": True,
+        "session_state": session_state,
+        "codex_running": codex_running,
+        "remote_ready": codex_running and bool(session_state.get("available")),
+        "supported_actions": list(SUPPORTED_GUI_ACTIONS),
+    }
 
 
 # ── Public API ───────────────────────────────────────────────────────────────
