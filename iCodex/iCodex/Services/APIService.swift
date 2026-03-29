@@ -75,6 +75,16 @@ final class APIService {
         let message: String
     }
 
+    struct DisconnectResponse: Codable {
+        let disconnected: Bool
+        let deviceId: String?
+
+        enum CodingKeys: String, CodingKey {
+            case disconnected
+            case deviceId = "device_id"
+        }
+    }
+
     /// Exchange a 6-digit setup passcode for the API key.
     func setupAuth(passcode: String) async throws -> String {
         try await setupAuth(host: ServerConfig.shared.host, port: ServerConfig.shared.port, passcode: passcode)
@@ -109,6 +119,14 @@ final class APIService {
         try Self.validate(response)
         let result = try decoder.decode(AuthVerifyResponse.self, from: data)
         return result.authenticated
+    }
+
+    func disconnectCurrentDevice() async throws {
+        let url = URL(string: "\(baseURL)/auth/disconnect")!
+        let request = authenticatedJSONRequest(url: url, method: "POST")
+        let (data, response) = try await session.data(for: request)
+        try Self.validate(response)
+        _ = try decoder.decode(DisconnectResponse.self, from: data)
     }
 
     // MARK: - Health (no auth required)

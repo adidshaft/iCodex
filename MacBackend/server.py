@@ -365,6 +365,15 @@ async def auth_verify(_token: str = Depends(require_auth)) -> dict:
     return {"authenticated": True, "message": "Token is valid"}
 
 
+@app.post("/auth/disconnect")
+async def auth_disconnect(_request: Request, token: str = Depends(require_auth)) -> dict:
+    """Explicitly disconnect the currently authenticated device."""
+    device_id = _device_id_for_token(token)
+    removed_http = _connected_devices.pop(device_id, None) is not None
+    removed_ws = _connected_ws_devices.pop(device_id, None) is not None
+    return {"disconnected": removed_http or removed_ws, "device_id": device_id}
+
+
 # ── Network Info ─────────────────────────────────────────────────────────────
 
 

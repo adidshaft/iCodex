@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var passcodeInput: String = ""
     @State private var authStatus: AuthStatus = .idle
     @State private var isShowingQRScanner = false
+    @State private var isDisconnecting = false
 
     struct DiscoveredServer: Identifiable {
         let id = UUID()
@@ -379,19 +380,18 @@ struct SettingsView: View {
                     )
 
                     Button(role: .destructive) {
-                        config.clearAuth()
-                        authStatus = .idle
-                        passcodeInput = ""
+                        disconnectCurrentPhone()
                     } label: {
                         actionLabel(
-                            title: "Disconnect This iPhone",
+                            title: isDisconnecting ? "Disconnecting..." : "Disconnect This iPhone",
                             subtitle: "Remove the stored pairing key and reconnect later if needed",
                             icon: "lock.open",
                             emphasis: false,
-                            loading: false
+                            loading: isDisconnecting
                         )
                     }
                     .buttonStyle(.plain)
+                    .disabled(isDisconnecting)
                 } else {
                     Button {
                         isShowingQRScanner = true
@@ -815,6 +815,25 @@ struct SettingsView: View {
                 await MainActor.run {
                     authStatus = .error("Could not pair from the QR code. Make sure iCodex-Connect is running on your Mac.")
                 }
+            }
+        }
+    }
+
+    private func disconnectCurrentPhone() {
+        isDisconnecting = true
+
+        Task {
+            do {
+                try await APIService.shared.disconnectCurrentDevice()
+            } catch {
+                // Clear the local pairing even if the connector is unreachable.
+            }
+
+            await MainActor.run {
+                config.clearAuth()
+                authStatus = .idle
+                passcodeInput = ""
+                isDisconnecting = false
             }
         }
     }

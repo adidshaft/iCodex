@@ -558,6 +558,8 @@ func printJSON<T: Encodable>(_ value: T) {
 private let backendPort = 8642
 private let latestDmgURL = "https://github.com/adidshaft/iCodex/releases/download/main-build/iCodex-Connect.dmg"
 private let autoOpenInterval: TimeInterval = 24 * 60 * 60
+private let passiveRefreshInterval: TimeInterval = 2.0
+private let activeRefreshInterval: TimeInterval = 1.0
 
 struct InternalDeviceSnapshot: Codable {
     let id: String
@@ -699,7 +701,7 @@ func freeBackendPort() {
     shell("/bin/sh", ["-c", "lsof -ti:\(backendPort) 2>/dev/null | xargs kill -9 2>/dev/null || true"])
 }
 
-final class NativeMenuBarController: NSObject, NSApplicationDelegate {
+final class NativeMenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let execPath = CommandLine.arguments[0]
     private lazy var appURL = bundleURL(for: execPath)
     private lazy var appName = appURL.deletingPathExtension().lastPathComponent
@@ -749,13 +751,7 @@ final class NativeMenuBarController: NSObject, NSApplicationDelegate {
         ensureServerRunningIfNeeded()
         refreshStatus()
 
-        refreshTimer = Timer.scheduledTimer(
-            timeInterval: 5.0,
-            target: self,
-            selector: #selector(refreshTimerFired(_:)),
-            userInfo: nil,
-            repeats: true
-        )
+        configureRefreshTimer(interval: passiveRefreshInterval)
 
         if shouldAutoOpenPairingMenu() {
             markPairingMenuAutoOpened()
@@ -811,10 +807,12 @@ final class NativeMenuBarController: NSObject, NSApplicationDelegate {
             button.title = " iC"
         }
         statusItem.button?.toolTip = "iCodex-Connect"
+        statusItem.button?.appearsDisabled = false
         statusItem.menu = menu
     }
 
     private func setupMenu() {
+        menu.delegate = self
         statusMenuItem.isEnabled = false
         menu.addItem(statusMenuItem)
         menu.addItem(.separator())
@@ -913,6 +911,17 @@ final class NativeMenuBarController: NSObject, NSApplicationDelegate {
         return view
     }
 
+    private func configureRefreshTimer(interval: TimeInterval) {
+        refreshTimer?.invalidate()
+        refreshTimer = Timer.scheduledTimer(
+            timeInterval: interval,
+            target: self,
+            selector: #selector(refreshTimerFired(_:)),
+            userInfo: nil,
+            repeats: true
+        )
+    }
+
     private func shouldAutoOpenPairingMenu() -> Bool {
         Date().timeIntervalSince1970 - menuState.lastPairingMenuOpenedAt >= autoOpenInterval
     }
@@ -983,6 +992,8 @@ final class NativeMenuBarController: NSObject, NSApplicationDelegate {
             return
         }
 
+        let accessibilityGranted = CGPreflightPostEventAccess()
+
         guard let status else {
             imageView.image = nil
             subtitle.stringValue = "Start the server to generate the pairing QR."
@@ -1012,10 +1023,14 @@ final class NativeMenuBarController: NSObject, NSApplicationDelegate {
 
         let pairingURL = "icodex://pair?host=\(status.local_ip)&port=\(status.port)&passcode=\(status.passcode)"
         imageView.image = generateQRCodeImage(payload: pairingURL)
-        subtitle.stringValue = "Scan to pair instantly. The pairing code refreshes every 24 hours."
+        subtitle.stringValue = accessibilityGranted
+            ? "Scan to pair instantly. The pairing code refreshes every 24 hours."
+            : "Pairing is ready. Enable Accessibility below to unlock remote control."
         host.stringValue = "Mac: \(status.local_ip):\(status.port)"
         passcode.stringValue = "Passcode: \(status.passcode)"
-        hint.stringValue = "Tip: Camera scan jumps straight into iCodex."
+        hint.stringValue = accessibilityGranted
+            ? "Tip: Camera scan jumps straight into iCodex."
+            : "Step 1: click Accessibility in this menu. Pairing still works without it."
     }
 
     private func rebuildDevicesMenu(with devices: [InternalDeviceSnapshot]) {
@@ -1050,6 +1065,15 @@ final class NativeMenuBarController: NSObject, NSApplicationDelegate {
         refreshStatus()
     }
 
+    func menuWillOpen(_ menu: NSMenu) {
+        configureRefreshTimer(interval: activeRefreshInterval)
+        refreshStatus()
+    }
+
+    func menuDidClose(_ menu: NSMenu) {
+        configureRefreshTimer(interval: passiveRefreshInterval)
+    }
+
     private func refreshStatus() {
         let status = fetchPairingStatus()
         if status == nil, wantsServerRunning, serverProcess?.isRunning != true {
@@ -1070,7 +1094,7 @@ final class NativeMenuBarController: NSObject, NSApplicationDelegate {
         let granted = CGPreflightPostEventAccess()
         accessibilityItem.title = granted
             ? "Accessibility: Granted"
-            : "Accessibility: Not granted (click to fix)"
+            : "Accessibility: Required for remote control (click to fix)"
 
         updateTooltip(running: running, devicesCount: devices.count)
         updateQRPreview(with: status)
