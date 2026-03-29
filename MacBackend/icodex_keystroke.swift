@@ -15,6 +15,7 @@
 import Cocoa
 import ApplicationServices
 import CoreGraphics
+import Darwin
 import Foundation
 
 // MARK: - Keystroke helpers
@@ -552,45 +553,614 @@ func printJSON<T: Encodable>(_ value: T) {
     print(string)
 }
 
-// MARK: - App launcher mode
+// MARK: - Native menu bar app
 
-func launchBackend() {
-    // When invoked with no args, we're the CFBundleExecutable being launched
-    // by macOS. Spawn the bash launcher script to set up Python + start server.
-    let execPath = CommandLine.arguments[0]
-    let appURL = bundleURL(for: execPath)
-    let appName = appURL.deletingPathExtension().lastPathComponent
-    if !isInstalledInApplications(appURL) {
-        promptToInstallInApplications(appURL: appURL)
+private let backendPort = 8642
+private let latestDmgURL = "https://github.com/adidshaft/iCodex/releases/download/main-build/iCodex-Connect.dmg"
+private let autoOpenInterval: TimeInterval = 24 * 60 * 60
+
+struct InternalDeviceSnapshot: Codable {
+    let id: String
+    let ip: String
+    let name: String
+}
+
+struct PairingStatusSnapshot: Codable {
+    let running: Bool
+    let local_ip: String
+    let port: Int
+    let passcode: String
+    let devices: [InternalDeviceSnapshot]
+}
+
+struct MenuState: Codable {
+    var lastPairingMenuOpenedAt: TimeInterval = 0
+}
+
+func appSupportDirectory() -> URL {
+    let root = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+    return root.appendingPathComponent("Library/Application Support/iCodex-Connect", isDirectory: true)
+}
+
+func menuStateURL() -> URL {
+    appSupportDirectory().appendingPathComponent("menu_state.json")
+}
+
+func instanceLockURL() -> URL {
+    appSupportDirectory().appendingPathComponent("menu.lock")
+}
+
+func authFileURL() -> URL {
+    URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+        .appendingPathComponent(".codex/icodex_auth.json")
+}
+
+func internalRequestData(path: String, method: String = "GET") -> Data? {
+    guard let url = URL(string: "http://127.0.0.1:\(backendPort)\(path)") else {
+        return nil
     }
-    cleanupMountedInstallerVolumes(appNamed: appName, excluding: appURL)
 
-    let macosDir = (execPath as NSString).deletingLastPathComponent
-    let contentsDir = (macosDir as NSString).deletingLastPathComponent
-    let resourcesDir = (contentsDir as NSString).appendingPathComponent("Resources")
-    let launcher = (resourcesDir as NSString).appendingPathComponent("icodex_launcher.sh")
+    var request = URLRequest(url: url, timeoutInterval: 1.5)
+    request.httpMethod = method
+    request.setValue("menubar", forHTTPHeaderField: "X-Internal")
+    if method != "GET" {
+        request.httpBody = Data()
+    }
+
+    let semaphore = DispatchSemaphore(value: 0)
+    var output: Data?
+    URLSession.shared.dataTask(with: request) { data, response, _ in
+        if let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) {
+            output = data
+        }
+        semaphore.signal()
+    }.resume()
+    _ = semaphore.wait(timeout: .now() + 2.0)
+    return output
+}
+
+func fetchPairingStatus() -> PairingStatusSnapshot? {
+    guard let data = internalRequestData(path: "/internal/pairing-status") else {
+        return nil
+    }
+    return try? JSONDecoder().decode(PairingStatusSnapshot.self, from: data)
+}
+
+func disconnectDevice(_ deviceID: String) -> Bool {
+    internalRequestData(path: "/internal/devices/\(deviceID)/disconnect", method: "POST") != nil
+}
+
+func disconnectAllDevices() -> Bool {
+    internalRequestData(path: "/internal/devices/disconnect-all", method: "POST") != nil
+}
+
+func readMenuState() -> MenuState {
+    let url = menuStateURL()
+    guard let data = try? Data(contentsOf: url),
+          let state = try? JSONDecoder().decode(MenuState.self, from: data) else {
+        return MenuState()
+    }
+    return state
+}
+
+func writeMenuState(_ state: MenuState) {
+    let dir = appSupportDirectory()
+    try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    if let data = try? JSONEncoder().encode(state) {
+        try? data.write(to: menuStateURL(), options: [.atomic])
+    }
+}
+
+func fallbackPasscode() -> String {
+    guard let data = try? Data(contentsOf: authFileURL()),
+          let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+          let passcode = object["setup_passcode"] as? String else {
+        return "------"
+    }
+    return passcode
+}
+
+func generateQRCodeImage(payload: String, size: CGFloat = 120) -> NSImage? {
+    guard let data = payload.data(using: .utf8),
+          let filter = CIFilter(name: "CIQRCodeGenerator") else {
+        return nil
+    }
+
+    filter.setValue(data, forKey: "inputMessage")
+    filter.setValue("M", forKey: "inputCorrectionLevel")
+    guard let outputImage = filter.outputImage else {
+        return nil
+    }
+
+    let scaleX = size / outputImage.extent.size.width
+    let scaleY = size / outputImage.extent.size.height
+    let transformed = outputImage.transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
+    let rep = NSCIImageRep(ciImage: transformed)
+    let image = NSImage(size: NSSize(width: size, height: size))
+    image.addRepresentation(rep)
+    return image
+}
+
+func openAccessibilitySettings() {
+    guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") else {
+        return
+    }
+    NSWorkspace.shared.open(url)
+}
+
+func shell(_ launchPath: String, _ arguments: [String]) {
     let task = Process()
-    task.executableURL = URL(fileURLWithPath: "/bin/bash")
-    task.arguments = [launcher]
-    task.currentDirectoryURL = URL(fileURLWithPath: macosDir)
-    task.environment = ProcessInfo.processInfo.environment
-    // Detach: launcher runs in background, we exit so macOS is happy
-    do {
-        try task.run()
-    } catch {
-        fputs("error: could not launch backend: \(error)\n", stderr)
-        exit(1)
+    task.executableURL = URL(fileURLWithPath: launchPath)
+    task.arguments = arguments
+    try? task.run()
+}
+
+func freeBackendPort() {
+    shell("/bin/sh", ["-c", "lsof -ti:\(backendPort) 2>/dev/null | xargs kill -9 2>/dev/null || true"])
+}
+
+final class NativeMenuBarController: NSObject, NSApplicationDelegate {
+    private let execPath = CommandLine.arguments[0]
+    private lazy var appURL = bundleURL(for: execPath)
+    private lazy var appName = appURL.deletingPathExtension().lastPathComponent
+    private lazy var resourcesURL = appURL.appendingPathComponent("Contents/Resources", isDirectory: true)
+    private lazy var launcherURL = resourcesURL.appendingPathComponent("icodex_launcher.sh")
+
+    private var statusItem: NSStatusItem!
+    private let menu = NSMenu()
+    private let statusMenuItem = NSMenuItem(title: "Server: Starting…", action: nil, keyEquivalent: "")
+    private let startStopItem = NSMenuItem(title: "Start Server", action: #selector(toggleServer(_:)), keyEquivalent: "")
+    private let urlItem = NSMenuItem(title: "Server URL unavailable", action: #selector(copyURL(_:)), keyEquivalent: "")
+    private let passcodeItem = NSMenuItem(title: "Passcode: ------", action: #selector(copyPasscode(_:)), keyEquivalent: "")
+    private let qrPreviewItem = NSMenuItem()
+    private let pairingLinkItem = NSMenuItem(title: "Copy Pairing Link", action: #selector(copyPairingLink(_:)), keyEquivalent: "")
+    private let updateItem = NSMenuItem(title: "Download Latest Build", action: #selector(downloadLatestBuild(_:)), keyEquivalent: "")
+    private let accessibilityItem = NSMenuItem(title: "Accessibility: Checking…", action: #selector(openAccessibility(_:)), keyEquivalent: "")
+    private let devicesRootItem = NSMenuItem(title: "Devices (0)", action: nil, keyEquivalent: "")
+    private let devicesMenu = NSMenu()
+    private let quitItem = NSMenuItem(title: "Quit iCodex", action: #selector(quitApp(_:)), keyEquivalent: "q")
+
+    private var qrImageView: NSImageView?
+    private var qrSubtitleField: NSTextField?
+    private var qrHostField: NSTextField?
+    private var qrPasscodeField: NSTextField?
+    private var qrHintField: NSTextField?
+
+    private var refreshTimer: Timer?
+    private var serverProcess: Process?
+    private var wantsServerRunning = true
+    private var lastStatus: PairingStatusSnapshot?
+    private var menuState = readMenuState()
+    private var instanceLockDescriptor: Int32 = -1
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        if !isInstalledInApplications(appURL) {
+            promptToInstallInApplications(appURL: appURL)
+        }
+
+        guard acquireInstanceLock() else {
+            NSApp.terminate(nil)
+            return
+        }
+
+        cleanupMountedInstallerVolumes(appNamed: appName, excluding: appURL)
+        setupStatusItem()
+        setupMenu()
+        ensureServerRunningIfNeeded()
+        refreshStatus()
+
+        refreshTimer = Timer.scheduledTimer(
+            timeInterval: 5.0,
+            target: self,
+            selector: #selector(refreshTimerFired(_:)),
+            userInfo: nil,
+            repeats: true
+        )
+
+        if shouldAutoOpenPairingMenu() {
+            markPairingMenuAutoOpened()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+                self?.statusItem.button?.performClick(nil)
+            }
+        }
     }
-    // Exit immediately — the bash launcher → Python will keep running
-    exit(0)
+
+    func applicationWillTerminate(_ notification: Notification) {
+        refreshTimer?.invalidate()
+        stopServer()
+        cleanupMountedInstallerVolumes(appNamed: appName, excluding: appURL)
+        releaseInstanceLock()
+    }
+
+    private func acquireInstanceLock() -> Bool {
+        let supportDirectory = appSupportDirectory()
+        try? FileManager.default.createDirectory(at: supportDirectory, withIntermediateDirectories: true)
+
+        let descriptor = open(instanceLockURL().path, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR)
+        guard descriptor != -1 else {
+            return false
+        }
+        guard flock(descriptor, LOCK_EX | LOCK_NB) == 0 else {
+            close(descriptor)
+            return false
+        }
+        instanceLockDescriptor = descriptor
+        return true
+    }
+
+    private func releaseInstanceLock() {
+        guard instanceLockDescriptor != -1 else {
+            return
+        }
+        flock(instanceLockDescriptor, LOCK_UN)
+        close(instanceLockDescriptor)
+        instanceLockDescriptor = -1
+    }
+
+    private func setupStatusItem() {
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        if let button = statusItem.button {
+            if let image = NSImage(
+                systemSymbolName: "qrcode.viewfinder",
+                accessibilityDescription: "iCodex-Connect"
+            ) {
+                image.isTemplate = true
+                button.image = image
+                button.imagePosition = .imageLeading
+            }
+            button.title = " iC"
+        }
+        statusItem.button?.toolTip = "iCodex-Connect"
+        statusItem.menu = menu
+    }
+
+    private func setupMenu() {
+        statusMenuItem.isEnabled = false
+        menu.addItem(statusMenuItem)
+        menu.addItem(.separator())
+
+        startStopItem.target = self
+        menu.addItem(startStopItem)
+
+        urlItem.target = self
+        menu.addItem(urlItem)
+
+        passcodeItem.target = self
+        menu.addItem(passcodeItem)
+
+        qrPreviewItem.view = makeQRPreviewView()
+        qrPreviewItem.isEnabled = false
+        menu.addItem(qrPreviewItem)
+
+        pairingLinkItem.target = self
+        menu.addItem(pairingLinkItem)
+
+        updateItem.target = self
+        menu.addItem(updateItem)
+
+        menu.addItem(.separator())
+
+        accessibilityItem.target = self
+        menu.addItem(accessibilityItem)
+
+        devicesRootItem.submenu = devicesMenu
+        menu.addItem(devicesRootItem)
+
+        menu.addItem(.separator())
+
+        quitItem.target = self
+        menu.addItem(quitItem)
+    }
+
+    private func makeLabel(_ text: String, frame: NSRect, font: NSFont, alpha: CGFloat = 1.0) -> NSTextField {
+        let label = NSTextField(labelWithString: text)
+        label.frame = frame
+        label.alignment = .center
+        label.font = font
+        label.textColor = NSColor.labelColor.withAlphaComponent(alpha)
+        return label
+    }
+
+    private func makeQRPreviewView() -> NSView {
+        let view = NSView(frame: NSRect(x: 0, y: 0, width: 296, height: 260))
+
+        let title = makeLabel(
+            "Pair iPhone with this Mac",
+            frame: NSRect(x: 18, y: 228, width: 260, height: 20),
+            font: .boldSystemFont(ofSize: 14)
+        )
+        view.addSubview(title)
+
+        let subtitle = makeLabel(
+            "Scan with Camera or the in-app QR scanner.",
+            frame: NSRect(x: 18, y: 204, width: 260, height: 18),
+            font: .systemFont(ofSize: 12),
+            alpha: 0.78
+        )
+        view.addSubview(subtitle)
+        qrSubtitleField = subtitle
+
+        let imageView = NSImageView(frame: NSRect(x: 88, y: 74, width: 120, height: 120))
+        imageView.imageScaling = .scaleProportionallyUpOrDown
+        view.addSubview(imageView)
+        qrImageView = imageView
+
+        let host = makeLabel(
+            "",
+            frame: NSRect(x: 18, y: 44, width: 260, height: 18),
+            font: .systemFont(ofSize: 12)
+        )
+        view.addSubview(host)
+        qrHostField = host
+
+        let passcode = makeLabel(
+            "",
+            frame: NSRect(x: 18, y: 24, width: 260, height: 18),
+            font: .monospacedDigitSystemFont(ofSize: 12, weight: .semibold)
+        )
+        view.addSubview(passcode)
+        qrPasscodeField = passcode
+
+        let hint = makeLabel(
+            "",
+            frame: NSRect(x: 18, y: 6, width: 260, height: 14),
+            font: .systemFont(ofSize: 11),
+            alpha: 0.72
+        )
+        view.addSubview(hint)
+        qrHintField = hint
+
+        return view
+    }
+
+    private func shouldAutoOpenPairingMenu() -> Bool {
+        Date().timeIntervalSince1970 - menuState.lastPairingMenuOpenedAt >= autoOpenInterval
+    }
+
+    private func markPairingMenuAutoOpened() {
+        menuState.lastPairingMenuOpenedAt = Date().timeIntervalSince1970
+        writeMenuState(menuState)
+    }
+
+    private func ensureServerRunningIfNeeded() {
+        guard wantsServerRunning else {
+            return
+        }
+        if fetchPairingStatus() != nil {
+            return
+        }
+        startServer()
+    }
+
+    private func startServer() {
+        guard serverProcess?.isRunning != true else {
+            return
+        }
+
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/bin/bash")
+        task.arguments = [launcherURL.path]
+        task.currentDirectoryURL = resourcesURL
+        task.environment = ProcessInfo.processInfo.environment
+        task.terminationHandler = { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.serverProcess = nil
+                self?.refreshStatus()
+            }
+        }
+
+        do {
+            try task.run()
+            serverProcess = task
+        } catch {
+            NSSound.beep()
+            fputs("error: could not start local backend: \(error)\n", stderr)
+        }
+    }
+
+    private func stopServer() {
+        serverProcess?.terminate()
+        serverProcess = nil
+        freeBackendPort()
+    }
+
+    private func updateTooltip(running: Bool, devicesCount: Int) {
+        if running {
+            statusItem.button?.toolTip = devicesCount > 0
+                ? "iCodex-Connect running · \(devicesCount) device\(devicesCount == 1 ? "" : "s") connected"
+                : "iCodex-Connect running"
+        } else {
+            statusItem.button?.toolTip = "iCodex-Connect stopped"
+        }
+    }
+
+    private func updateQRPreview(with status: PairingStatusSnapshot?) {
+        guard let subtitle = qrSubtitleField,
+              let host = qrHostField,
+              let passcode = qrPasscodeField,
+              let hint = qrHintField,
+              let imageView = qrImageView else {
+            return
+        }
+
+        guard let status else {
+            imageView.image = nil
+            subtitle.stringValue = "Start the server to generate the pairing QR."
+            host.stringValue = "Open iCodex-Connect from the menu bar any time."
+            passcode.stringValue = ""
+            hint.stringValue = ""
+            return
+        }
+
+        guard !status.local_ip.isEmpty, status.local_ip != "127.0.0.1" else {
+            imageView.image = nil
+            subtitle.stringValue = "Join Wi-Fi to generate the pairing QR."
+            host.stringValue = "The iPhone app can still pair manually later."
+            passcode.stringValue = ""
+            hint.stringValue = ""
+            return
+        }
+
+        guard status.passcode.count == 6 else {
+            imageView.image = nil
+            subtitle.stringValue = "Pairing passcode is still loading."
+            host.stringValue = "Mac: \(status.local_ip):\(status.port)"
+            passcode.stringValue = ""
+            hint.stringValue = "Retry in a moment."
+            return
+        }
+
+        let pairingURL = "icodex://pair?host=\(status.local_ip)&port=\(status.port)&passcode=\(status.passcode)"
+        imageView.image = generateQRCodeImage(payload: pairingURL)
+        subtitle.stringValue = "Scan to pair instantly. The pairing code refreshes every 24 hours."
+        host.stringValue = "Mac: \(status.local_ip):\(status.port)"
+        passcode.stringValue = "Passcode: \(status.passcode)"
+        hint.stringValue = "Tip: Camera scan jumps straight into iCodex."
+    }
+
+    private func rebuildDevicesMenu(with devices: [InternalDeviceSnapshot]) {
+        devicesMenu.removeAllItems()
+        devicesRootItem.title = "Devices (\(devices.count))"
+
+        if devices.isEmpty {
+            let empty = NSMenuItem(title: "No devices connected", action: nil, keyEquivalent: "")
+            empty.isEnabled = false
+            devicesMenu.addItem(empty)
+            return
+        }
+
+        for device in devices {
+            let item = NSMenuItem(
+                title: "\(device.name) (\(device.ip))",
+                action: #selector(disconnectDeviceAction(_:)),
+                keyEquivalent: ""
+            )
+            item.target = self
+            item.representedObject = device.id
+            devicesMenu.addItem(item)
+        }
+
+        devicesMenu.addItem(.separator())
+        let disconnectAll = NSMenuItem(title: "Disconnect All", action: #selector(disconnectAllDevicesAction(_:)), keyEquivalent: "")
+        disconnectAll.target = self
+        devicesMenu.addItem(disconnectAll)
+    }
+
+    @objc private func refreshTimerFired(_ timer: Timer) {
+        refreshStatus()
+    }
+
+    private func refreshStatus() {
+        let status = fetchPairingStatus()
+        if status == nil, wantsServerRunning, serverProcess?.isRunning != true {
+            startServer()
+        }
+        lastStatus = status
+
+        let running = status?.running == true
+        let host = status?.local_ip ?? ""
+        let passcode = status?.passcode ?? fallbackPasscode()
+        let devices = status?.devices ?? []
+
+        statusMenuItem.title = running ? "Server: Running" : "Server: Stopped"
+        startStopItem.title = running ? "Stop Server" : "Start Server"
+        urlItem.title = running && !host.isEmpty ? "http://\(host):\(backendPort)  ⧉" : "Server URL unavailable"
+        passcodeItem.title = passcode.count == 6 ? "Passcode: \(passcode)  ⧉" : "Passcode: ------"
+
+        let granted = CGPreflightPostEventAccess()
+        accessibilityItem.title = granted
+            ? "Accessibility: Granted"
+            : "Accessibility: Not granted (click to fix)"
+
+        updateTooltip(running: running, devicesCount: devices.count)
+        updateQRPreview(with: status)
+        rebuildDevicesMenu(with: devices)
+    }
+
+    @objc private func toggleServer(_ sender: Any?) {
+        if lastStatus?.running == true {
+            wantsServerRunning = false
+            stopServer()
+        } else {
+            wantsServerRunning = true
+            startServer()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+            self?.refreshStatus()
+        }
+    }
+
+    @objc private func copyURL(_ sender: Any?) {
+        guard let status = lastStatus else {
+            NSSound.beep()
+            return
+        }
+        setClipboard("http://\(status.local_ip):\(status.port)")
+    }
+
+    @objc private func copyPasscode(_ sender: Any?) {
+        let passcode = lastStatus?.passcode ?? fallbackPasscode()
+        guard passcode.count == 6 else {
+            NSSound.beep()
+            return
+        }
+        setClipboard(passcode)
+    }
+
+    @objc private func copyPairingLink(_ sender: Any?) {
+        guard let status = lastStatus, status.passcode.count == 6 else {
+            NSSound.beep()
+            return
+        }
+        let pairingURL = "icodex://pair?host=\(status.local_ip)&port=\(status.port)&passcode=\(status.passcode)"
+        setClipboard(pairingURL)
+    }
+
+    @objc private func downloadLatestBuild(_ sender: Any?) {
+        guard let url = URL(string: latestDmgURL) else {
+            return
+        }
+        NSWorkspace.shared.open(url)
+    }
+
+    @objc private func openAccessibility(_ sender: Any?) {
+        if CGPreflightPostEventAccess() {
+            refreshStatus()
+            return
+        }
+        CGRequestPostEventAccess()
+        openAccessibilitySettings()
+        refreshStatus()
+    }
+
+    @objc private func disconnectDeviceAction(_ sender: NSMenuItem) {
+        guard let deviceID = sender.representedObject as? String else {
+            return
+        }
+        _ = disconnectDevice(deviceID)
+        refreshStatus()
+    }
+
+    @objc private func disconnectAllDevicesAction(_ sender: Any?) {
+        _ = disconnectAllDevices()
+        refreshStatus()
+    }
+
+    @objc private func quitApp(_ sender: Any?) {
+        NSApp.terminate(nil)
+    }
 }
 
 // MARK: - Main
 
 let args = CommandLine.arguments
 if args.count < 2 {
-    // No arguments = launched as the app → start the backend
-    launchBackend()
+    let app = NSApplication.shared
+    app.setActivationPolicy(.accessory)
+    let delegate = NativeMenuBarController()
+    app.delegate = delegate
+    app.run()
+    exit(0)
 }
 
 switch args[1] {

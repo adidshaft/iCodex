@@ -3,7 +3,7 @@ import Combine
 
 final class ServerConfig: ObservableObject {
     static let shared = ServerConfig()
-    static let idleSessionTimeout: TimeInterval = 7 * 24 * 60 * 60
+    static let idleSessionTimeout: TimeInterval = 24 * 60 * 60
 
     private enum DefaultsKey {
         static let host = "server_host"
@@ -52,7 +52,7 @@ final class ServerConfig: ObservableObject {
             defaults.removeObject(forKey: DefaultsKey.apiKey)
             defaults.removeObject(forKey: DefaultsKey.lastActiveAt)
             defaults.removeObject(forKey: DefaultsKey.lastAuthenticatedAt)
-            self.launchStatusMessage = "Saved pairing expired after 7 days of inactivity. Scan the pairing QR to reconnect."
+            self.launchStatusMessage = "Saved pairing expired after 24 hours of inactivity. Scan the pairing QR to reconnect."
         } else {
             self.apiKey = storedKey
             if !storedKey.isEmpty {

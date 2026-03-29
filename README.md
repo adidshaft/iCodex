@@ -1,6 +1,6 @@
 # CodexManagerSystem
 
-A two-part system for managing the Codex CLI remotely: a **macOS Menu Bar backend** (Python/FastAPI) and a **native iOS frontend** (SwiftUI).
+A two-part system for managing Codex remotely: a **native macOS menu bar companion** backed by **Python/FastAPI**, and a **native iOS frontend** (SwiftUI).
 
 ## Project Structure
 
@@ -12,7 +12,8 @@ iCodex/
 │   ├── models.py              Pydantic request/response models
 │   ├── codex_runner.py        Async Codex CLI task manager with streaming
 │   ├── server.py              FastAPI REST + WebSocket endpoints
-│   ├── menubar_app.py         Rumps macOS status bar app (Start/Stop/Quit)
+│   ├── icodex_keystroke.swift Native macOS menu bar app + GUI control helper
+│   ├── build_dmg.sh           Builds the signed/notarized iCodex-Connect DMG
 │   ├── requirements.txt
 │   ├── .env                   Local environment config
 │   └── .env.example           Template for environment variables
@@ -34,19 +35,25 @@ iCodex/
 
 ## macOS Backend Setup
 
-### Option A: Menu Bar App
+### Option A: Build the macOS companion app
 
 ```bash
 cd MacBackend
-source venv/bin/activate
-python menubar_app.py
+bash build_dmg.sh
 ```
 
-A brain icon (🧠) appears in your menu bar with these options:
+This creates:
 
-- **Start Server** – launches the FastAPI server on port 8642
-- **Stop Server** – shuts down the server
-- **Quit** – exits the menu bar app
+- `MacBackend/build/iCodex-Connect.app`
+- `MacBackend/build/iCodex-Connect-2.1.0.dmg`
+
+Install `iCodex-Connect.app` into Applications and open it. A menu bar item appears with:
+
+- **Start Server / Stop Server**
+- **Pairing QR + passcode**
+- **Accessibility status + fix**
+- **Download Latest Build**
+- **Quit iCodex**
 
 ### Option B: Run the Server Directly
 
@@ -101,9 +108,9 @@ curl -X POST http://localhost:8642/tasks \
 ### Connecting to Your Mac
 
 1. Open the **Settings** tab in the iOS app
-2. Enter your Mac's local IP address (find it via `ifconfig en0` or System Settings → Wi-Fi)
-3. Keep the port as `8642` (or whatever you configured)
-4. Tap **Test Connection** to verify
+2. Pair using the QR shown by the Mac menu bar app, or enter your Mac's host/port/passcode manually
+3. Keep the port as `8642` unless you changed it
+4. After pairing, the iPhone stores the connection and talks directly to your Mac
 
 > Both devices must be on the same local network.
 

@@ -11,10 +11,12 @@ import os
 import random
 import secrets
 import string
+import time
 from pathlib import Path
 
 
 AUTH_FILE = Path.home() / ".codex" / "icodex_auth.json"
+PASSCODE_TTL_SECONDS = 24 * 60 * 60
 _state: dict = {}
 
 
@@ -80,9 +82,26 @@ def generate_setup_passcode() -> str:
     passcode = "".join(random.choices(string.digits, k=6))
     state = _load_state()
     state["setup_passcode"] = passcode
+    state["setup_passcode_generated_at"] = time.time()
     _state.update(state)
     _save_state()
     return passcode
+
+
+def _is_passcode_expired(state: dict) -> bool:
+    generated_at = float(state.get("setup_passcode_generated_at", 0) or 0)
+    if generated_at <= 0:
+        return True
+    return time.time() - generated_at > PASSCODE_TTL_SECONDS
+
+
+def ensure_setup_passcode() -> str:
+    """Return the active setup passcode, rotating it if missing or older than 24h."""
+    state = _load_state()
+    stored = state.get("setup_passcode")
+    if not stored or _is_passcode_expired(state):
+        return generate_setup_passcode()
+    return stored
 
 
 def exchange_passcode(passcode: str) -> str | None:
@@ -94,7 +113,10 @@ def exchange_passcode(passcode: str) -> str | None:
     """
     state = _load_state()
     stored = state.get("setup_passcode")
-    if not stored or not secrets.compare_digest(passcode, stored):
+    if not stored or _is_passcode_expired(state):
+        generate_setup_passcode()
+        return None
+    if not secrets.compare_digest(passcode, stored):
         return None
 
     # Mark setup as complete, generate fresh passcode for next device
@@ -118,5 +140,5 @@ def init_auth() -> tuple[str, str]:
     Returns (api_key, setup_passcode).
     """
     api_key = get_api_key()
-    passcode = generate_setup_passcode()
+    passcode = ensure_setup_passcode()
     return api_key, passcode

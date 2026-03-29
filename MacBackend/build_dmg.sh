@@ -289,9 +289,9 @@ fi
 lsof -ti:8642 2>/dev/null | xargs kill -9 2>/dev/null || true
 sleep 0.5
 
-# ── Launch the menu bar app ──────────────────────────────────────────────
+# ── Launch the backend server ────────────────────────────────────────────
 cd "$BACKEND_DIR"
-exec "$VENV_DIR/bin/python" menubar_app.py >>"$LOG_DIR/icodex.log" 2>&1
+exec "$VENV_DIR/bin/python" server.py >>"$LOG_DIR/icodex.log" 2>>"$LOG_DIR/icodex_error.log"
 LAUNCHER
 chmod +x "$RESOURCES_DIR/icodex_launcher.sh"
 

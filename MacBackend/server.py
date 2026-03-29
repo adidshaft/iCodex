@@ -107,7 +107,7 @@ def _has_remote_presence() -> bool:
 async def _remote_awake_loop() -> None:
     while True:
         try:
-            stats = codex_data.get_thread_stats()
+            stats = await asyncio.to_thread(codex_data.get_thread_stats)
             has_running_threads = stats.get("running_threads", 0) > 0
             codex_gui.ensure_remote_awake(_has_remote_presence() or has_running_threads)
         except Exception:
@@ -312,7 +312,7 @@ def _thread_to_detail(t: dict) -> ThreadDetailResponse:
 @app.get("/health", response_model=ServerStatus)
 async def health() -> ServerStatus:
     try:
-        stats_data = codex_data.get_thread_stats()
+        stats_data = await asyncio.to_thread(codex_data.get_thread_stats)
         stats = ThreadStats(**stats_data)
     except Exception as exc:
         logger.error("Failed to read thread stats: %s", exc)
@@ -430,6 +430,26 @@ async def internal_list_devices(request: Request) -> list[dict]:
         d for d in _connected_devices.values()
         if now - d["last_seen"] < DEVICE_TIMEOUT
     ]
+
+
+@app.get("/internal/pairing-status")
+async def internal_pairing_status(request: Request) -> dict:
+    """Current server/pairing snapshot for the native menu-bar app."""
+    global _setup_passcode
+    _require_internal(request)
+    _setup_passcode = auth_module.ensure_setup_passcode()
+    now = time.time()
+    devices = [
+        d for d in _connected_devices.values()
+        if now - d["last_seen"] < DEVICE_TIMEOUT
+    ]
+    return {
+        "running": True,
+        "local_ip": _get_local_ip(),
+        "port": PORT,
+        "passcode": _setup_passcode,
+        "devices": devices,
+    }
 
 
 @app.post("/internal/devices/{device_id}/disconnect")
@@ -729,7 +749,7 @@ async def update_config(req: ConfigUpdateRequest, _token: str = Depends(require_
 
 @app.get("/stats", response_model=ThreadStats)
 async def get_stats(_token: str = Depends(require_auth)) -> ThreadStats:
-    return ThreadStats(**codex_data.get_thread_stats())
+    return ThreadStats(**(await asyncio.to_thread(codex_data.get_thread_stats)))
 
 
 # ── WebSocket: real-time updates ─────────────────────────────────────────────
@@ -749,7 +769,7 @@ async def ws_live(websocket: WebSocket, token: str = "") -> None:
         while True:
             data = await queue.get()
             if data["type"] == "threads_changed":
-                threads = codex_data.list_threads(limit=50)
+                threads = await asyncio.to_thread(codex_data.list_threads, limit=50)
                 await websocket.send_text(json.dumps({
                     "type": "threads_update",
                     "threads": [_thread_to_response(t).model_dump() for t in threads],
@@ -779,7 +799,7 @@ async def ws_thread(websocket: WebSocket, thread_id: str, token: str = "") -> No
         return
     device_id = _track_websocket_device(token)
 
-    thread = codex_data.get_thread(thread_id)
+    thread = await asyncio.to_thread(codex_data.get_thread, thread_id)
     if thread is None:
         _untrack_websocket_device(device_id)
         await websocket.close(code=4004, reason="Thread not found")
@@ -800,7 +820,7 @@ async def ws_thread(websocket: WebSocket, thread_id: str, token: str = "") -> No
                         "message": msg,
                     }))
             elif data["type"] == "threads_changed":
-                t = codex_data.get_thread(thread_id)
+                t = await asyncio.to_thread(codex_data.get_thread, thread_id)
                 if t:
                     await websocket.send_text(json.dumps({
                         "type": "thread_status",

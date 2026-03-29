@@ -28,7 +28,7 @@ Provide these answers in the **App Review Information** section / **Notes** fiel
     1.  Launch iCodex on your iPhone.
     2.  Show the "Local Network" permission prompt (if it's the first run).
     3.  Navigate to the **Settings** tab.
-    4.  Demonstrate pairing with your Mac by entering the IP/Port (or using the discovery feature).
+    4.  Demonstrate pairing with your Mac by scanning the QR shown by the Mac menu bar companion.
     5.  Return to the **Dashboard** to show the connection status is "Online".
     6.  Create a "New Task" (e.g., prompt: "Write a hello world in Python").
     7.  Go to the **Task Detail** view to show real-time logs streaming.
@@ -40,8 +40,8 @@ iCodex is a remote companion for the "Codex" CLI developer tool running locally 
 
 **3. Instructions for Access**
 The app operates strictly on the user’s local network and does not require a public user account.
-*   **Setup:** The user should install and run the `menubar_app.py` (found in the `MacBackend` directory of the companion source) on a Mac. (available at: https://icodex.kyokasuigetsu.xyz/)
-*   **Pairing:** When the Mac backend is running, it will display a local IP and port. In the iOS app, navigate to **Settings**, enter these details, and tap **Test Connection**. 
+*   **Setup:** The user should install and open the `iCodex-Connect` macOS companion app on a Mac. It runs as a menu bar app and is available at: https://icodex.kyokasuigetsu.xyz/
+*   **Pairing:** The Mac menu bar app shows a QR code and one-time 6-digit passcode. In the iOS app, pair by scanning the QR with the Camera app or the in-app QR scanner. Manual host/port/passcode entry is still available in Settings.
 *   **Reviewing Features:** Once connected, use the **New Task** screen to start a process. You can monitor the output in real-time on the **Task Detail** screen.
 
 **4. External Services**
