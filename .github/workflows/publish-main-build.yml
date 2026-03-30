@@ -19,6 +19,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Capture previous rolling release commit
+        run: |
+          set -euo pipefail
+          git fetch --force --tags origin
+          previous_sha="$(git rev-list -n 1 refs/tags/main-build 2>/dev/null || true)"
+          echo "PREVIOUS_MAIN_BUILD_SHA=$previous_sha" >> "$GITHUB_ENV"
+
       - name: Validate release signing secrets
         env:
           MACOS_DEVELOPER_ID_CERT_P12_BASE64: ${{ secrets.MACOS_DEVELOPER_ID_CERT_P12_BASE64 }}
@@ -65,6 +72,69 @@ jobs:
           {
             echo "RELEASE_VERSION=$version"
             echo "RELEASE_MIN_MACOS=12+"
+          } >> "$GITHUB_ENV"
+
+      - name: Generate rolling release summary
+        run: |
+          set -euo pipefail
+
+          collect_subjects() {
+            local range="$1"
+            if [ -n "$range" ]; then
+              git log --no-merges --pretty=format:'%s' "$range"
+            else
+              git log --no-merges --pretty=format:'%s' -n 12
+            fi
+          }
+
+          build_notes() {
+            local range="$1"
+            local -a notes=()
+            local seen=$'\n'
+            local subject=""
+
+            while IFS= read -r subject; do
+              [ -n "$subject" ] || continue
+              case "$seen" in
+                *$'\n'"$subject"$'\n'*) continue ;;
+              esac
+              notes+=("- $subject")
+              seen+="$subject"$'\n'
+              [ "${#notes[@]}" -ge 4 ] && break
+            done < <(collect_subjects "$range")
+
+            if [ "${#notes[@]}" -lt 3 ]; then
+              while IFS= read -r subject; do
+                [ -n "$subject" ] || continue
+                case "$seen" in
+                  *$'\n'"$subject"$'\n'*) continue ;;
+                esac
+                notes+=("- $subject")
+                seen+="$subject"$'\n'
+                [ "${#notes[@]}" -ge 4 ] && break
+              done < <(collect_subjects "")
+            fi
+
+            if [ "${#notes[@]}" -eq 0 ]; then
+              notes=(
+                "- Refreshed the rolling main build"
+                "- Updated signed and notarized Mac downloads"
+                "- Synced the website with the newest release metadata"
+              )
+            fi
+
+            printf '%s\n' "${notes[@]}"
+          }
+
+          range=""
+          if [ -n "${PREVIOUS_MAIN_BUILD_SHA:-}" ] && git cat-file -e "${PREVIOUS_MAIN_BUILD_SHA}^{commit}" 2>/dev/null; then
+            range="${PREVIOUS_MAIN_BUILD_SHA}..${GITHUB_SHA}"
+          fi
+
+          {
+            echo "RELEASE_NOTES<<EOF"
+            build_notes "$range"
+            echo "EOF"
           } >> "$GITHUB_ENV"
 
       - name: Decode release signing assets
@@ -216,6 +286,15 @@ jobs:
           git tag -f main-build "${GITHUB_SHA}"
           git push origin refs/tags/main-build --force
 
+      - name: Recreate rolling release so timestamps stay fresh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view main-build >/dev/null 2>&1; then
+            gh release delete main-build --yes
+          fi
+
       - name: Publish rolling release
         uses: ncipollo/release-action@v1
         with:
@@ -231,10 +310,12 @@ jobs:
             MacBackend/release/iCodex-Connect.app.zip
             MacBackend/release/SHA256SUMS.txt
           body: |
-            Automated rolling build from `${{ github.sha }}` on `main`.
+            What's new:
+            ${{ env.RELEASE_NOTES }}
 
             Version: `${{ env.RELEASE_VERSION }}`
             Minimum macOS: `${{ env.RELEASE_MIN_MACOS }}`
+            Commit: `${{ github.sha }}`
 
             This release is Developer ID signed and notarized before publication.
 

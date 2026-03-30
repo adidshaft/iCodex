@@ -232,7 +232,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     watcher_service.stop()
 
 
-app = FastAPI(title="iCodex API", version="2.1.0", lifespan=lifespan)
+app = FastAPI(title="iCodex API", version="2.2.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -318,7 +318,7 @@ async def health() -> ServerStatus:
         logger.error("Failed to read thread stats: %s", exc)
         stats = None
     return ServerStatus(
-        version="2.1.0",
+        version="2.2.0",
         stats=stats,
         uptime_seconds=round(time.time() - _start_time, 2),
     )
@@ -904,7 +904,7 @@ def start_server() -> None:
     _api_key, _setup_passcode = auth_module.init_auth()
 
     print(f"\n{'='*54}")
-    print(f"  iCodex API Server v2.1.0")
+    print(f"  iCodex API Server v2.2.0")
     print(f"  Local:   http://127.0.0.1:{PORT}")
     print(f"  Network: http://{local_ip}:{PORT}")
     print(f"{'─'*54}")

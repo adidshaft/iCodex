@@ -16,7 +16,7 @@ const supabaseConfig = {
 };
 
 const releaseMeta = {
-  version:     "2.1.0",
+  version:     "2.2.0",
   minimumMacOS:"12+",
   dmgChecksum: "DMG  Loading...",
   appChecksum: "ZIP  Loading...",

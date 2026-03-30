@@ -21,7 +21,7 @@ Release-relevant settings already present:
 - iOS build number: `1`
 - iOS device family: iPhone + iPad
 - iOS deployment target: `26.2`
-- macOS DMG version in the build script: `2.1.0`
+- macOS DMG version in the build script: `2.2.0`
 
 ## Launch blockers to clear first
 

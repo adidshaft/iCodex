@@ -45,7 +45,7 @@ bash build_dmg.sh
 This creates:
 
 - `MacBackend/build/iCodex-Connect.app`
-- `MacBackend/build/iCodex-Connect-2.1.0.dmg`
+- `MacBackend/build/iCodex-Connect-2.2.0.dmg`
 
 Install `iCodex-Connect.app` into Applications and open it. A menu bar item appears with:
 
