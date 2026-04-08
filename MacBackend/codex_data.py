@@ -570,10 +570,12 @@ def get_thread_gui_controls(thread_id: str) -> dict:
 
     result = codex_gui.list_controls(thread_id=thread_id)
     if result["success"]:
+        preview = codex_gui.capture_thread_preview(thread_id)
         return {
             "status": "available",
             "method": "gui",
             "controls": result.get("controls", []),
+            "preview": preview,
             "session_state": session_state,
             "codex_running": codex_running,
             "remote_ready": True,
@@ -583,6 +585,7 @@ def get_thread_gui_controls(thread_id: str) -> dict:
         "status": "gui_error",
         "error": result.get("error", ""),
         "controls": [],
+        "preview": {"success": False, "error": result.get("error", "")},
         "session_state": session_state,
         "codex_running": codex_running,
         "remote_ready": False,

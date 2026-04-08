@@ -127,6 +127,22 @@ def _wake_display() -> None:
         pass
 
 
+def _launch_codex_app() -> dict:
+    """Ask macOS to launch or activate the Codex app bundle."""
+    for args in (
+        ["open", "-b", CODEX_BUNDLE_ID],
+        ["open", "-a", CODEX_APP_NAME],
+        ["osascript", "-e", f'tell application id "{CODEX_BUNDLE_ID}" to activate'],
+    ):
+        try:
+            result = subprocess.run(args, capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                return {"success": True}
+        except Exception:
+            continue
+    return {"success": False, "error": "Could not launch Codex app."}
+
+
 def ensure_remote_awake(active: bool) -> None:
     """Hold a display/idle assertion while a remote session is active."""
     global _keepawake_proc
@@ -255,6 +271,16 @@ def check_accessibility() -> dict:
     }
 
 
+def probe_accessibility() -> dict:
+    """Check Accessibility access without triggering a prompt."""
+    result = _run_helper("check", timeout=5)
+    if not result["success"]:
+        return result
+    if result.get("output") == "granted":
+        return {"success": True}
+    return {"success": False, "error": "Accessibility permission not yet granted for iCodex-Connect."}
+
+
 def _ensure_interactable_session() -> dict:
     """Wake a sleepy screen and fail clearly if macOS is still locked."""
     _wake_display()
@@ -271,24 +297,26 @@ def _ensure_interactable_session() -> dict:
     return {"success": True, "session_state": state}
 
 
-def _focus_target(thread_id: str | None) -> dict:
+def _focus_target(thread_id: str | None, *, force_reopen: bool = False) -> dict:
     session = _ensure_interactable_session()
     if not session["success"]:
         return session
 
     if thread_id:
-        return _focus_thread(thread_id)
+        return _focus_thread(thread_id, force_reopen=force_reopen)
     if not is_gui_running():
         return {"success": False, "error": "Codex app is not running."}
     return {"success": True}
 
 
-def _focus_thread(thread_id: str) -> dict:
+def _focus_thread(thread_id: str, *, force_reopen: bool = False) -> dict:
     """Open the target Codex thread before sending any GUI automation."""
     global _last_focused_at, _last_focused_thread_id
 
     if (
-        _last_focused_thread_id == thread_id
+        not force_reopen
+        and is_gui_running()
+        and _last_focused_thread_id == thread_id
         and time.time() - _last_focused_at < THREAD_FOCUS_CACHE_SECONDS
     ):
         activate = _run_helper("activate", CODEX_BUNDLE_ID, timeout=5)
@@ -299,6 +327,14 @@ def _focus_thread(thread_id: str) -> dict:
         return {"success": True}
 
     deeplink = f"codex://threads/{thread_id}"
+
+    if not is_gui_running():
+        launch = _launch_codex_app()
+        if not launch["success"]:
+            return launch
+        deadline = time.time() + THREAD_OPEN_TIMEOUT_SECONDS
+        while time.time() < deadline and not is_gui_running():
+            time.sleep(0.2)
 
     try:
         result = subprocess.run(
@@ -338,6 +374,11 @@ def _focus_thread(thread_id: str) -> dict:
     return {"success": True}
 
 
+def recover_thread_focus(thread_id: str) -> dict:
+    """Force a thread to reopen and recover after app restarts or space changes."""
+    return _focus_thread(thread_id, force_reopen=True)
+
+
 def send_message(message: str, thread_id: str | None = None) -> dict:
     """Paste *message* into the selected Codex thread and press Return."""
     focus = _focus_target(thread_id)
@@ -370,7 +411,7 @@ def perform_key_action(action: str, thread_id: str | None = None) -> dict:
 
 def list_controls(thread_id: str | None = None) -> dict:
     """Return the currently mirrored set of GUI controls for the selected thread."""
-    focus = _focus_target(thread_id)
+    focus = _focus_target(thread_id, force_reopen=True)
     if not focus["success"]:
         return focus
 
@@ -383,12 +424,13 @@ def list_controls(thread_id: str | None = None) -> dict:
     except json.JSONDecodeError:
         return {"success": False, "error": "Could not decode GUI controls from helper."}
 
-    return {"success": True, "controls": controls}
+    preview = capture_thread_preview(thread_id) if thread_id else {"success": False}
+    return {"success": True, "controls": controls, "preview": preview}
 
 
 def press_control(control_id: str, thread_id: str | None = None) -> dict:
     """Press one mirrored GUI control in the selected Codex thread."""
-    focus = _focus_target(thread_id)
+    focus = _focus_target(thread_id, force_reopen=True)
     if not focus["success"]:
         return focus
 
@@ -409,7 +451,7 @@ def _press_matching_control(keywords: list[str]) -> dict:
 
 def interrupt(thread_id: str | None = None) -> dict:
     """Press Escape in the selected Codex thread to interrupt execution."""
-    focus = _focus_target(thread_id)
+    focus = _focus_target(thread_id, force_reopen=True)
     if not focus["success"]:
         return focus
 
@@ -425,7 +467,7 @@ def interrupt(thread_id: str | None = None) -> dict:
 
 def stop(thread_id: str | None = None) -> dict:
     """Send Ctrl-C to the selected Codex thread."""
-    focus = _focus_target(thread_id)
+    focus = _focus_target(thread_id, force_reopen=True)
     if not focus["success"]:
         return focus
 
@@ -437,3 +479,21 @@ def stop(thread_id: str | None = None) -> dict:
     if result["success"]:
         logger.info("Stop (Ctrl-C) sent to Codex GUI")
     return result
+
+
+def capture_thread_preview(thread_id: str | None = None, size: int = 320) -> dict:
+    """Capture a small PNG thumbnail of the active Codex GUI window."""
+    focus = _focus_target(thread_id)
+    if not focus["success"]:
+        return focus
+
+    result = _run_helper("thumbnail", CODEX_BUNDLE_ID, str(size), timeout=10)
+    if not result["success"]:
+        return result
+
+    try:
+        payload = json.loads(result.get("output") or "{}")
+    except json.JSONDecodeError:
+        return {"success": False, "error": "Could not decode preview payload."}
+    payload["success"] = True
+    return payload

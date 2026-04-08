@@ -202,11 +202,7 @@ func activateApp(bundleID: String) -> Bool {
     ).first else {
         return false
     }
-    if #available(macOS 14.0, *) {
-        app.activate()
-    } else {
-        app.activate(options: .activateIgnoringOtherApps)
-    }
+    app.activate(options: [.activateAllWindows])
     usleep(500_000)  // 0.5s for activation
     return true
 }
@@ -573,6 +569,27 @@ struct PairingStatusSnapshot: Codable {
     let port: Int
     let passcode: String
     let devices: [InternalDeviceSnapshot]
+    let api_version: String
+    let app_version: String
+    let release_tag: String
+    let release_url: String
+    let download_url: String
+    let website_url: String
+    let compatible: Bool
+    let requires_update: Bool
+    let update_message: String
+    let notes: [String]
+}
+
+struct ThumbnailSnapshot: Codable {
+    let success: Bool
+    let image_base64: String
+    let mime_type: String
+    let width: Int
+    let height: Int
+    let captured_at: Double
+    let window_title: String
+    let error: String?
 }
 
 struct MenuState: Codable {
@@ -681,6 +698,159 @@ func generateQRCodeImage(payload: String, size: CGFloat = 120) -> NSImage? {
     let image = NSImage(size: NSSize(width: size, height: size))
     image.addRepresentation(rep)
     return image
+}
+
+func axPointValue(_ element: AXUIElement, _ attribute: CFString) -> CGPoint? {
+    guard let anyValue = axCopyValue(element, attribute) else {
+        return nil
+    }
+    let value = anyValue as! AXValue
+    guard AXValueGetType(value) == .cgPoint else {
+        return nil
+    }
+    var point = CGPoint.zero
+    if AXValueGetValue(value, .cgPoint, &point) {
+        return point
+    }
+    return nil
+}
+
+func axSizeValue(_ element: AXUIElement, _ attribute: CFString) -> CGSize? {
+    guard let anyValue = axCopyValue(element, attribute) else {
+        return nil
+    }
+    let value = anyValue as! AXValue
+    guard AXValueGetType(value) == .cgSize else {
+        return nil
+    }
+    var size = CGSize.zero
+    if AXValueGetValue(value, .cgSize, &size) {
+        return size
+    }
+    return nil
+}
+
+func focusedWindowBounds(bundleID: String) -> CGRect? {
+    guard let window = focusedWindowElement(bundleID: bundleID),
+          let origin = axPointValue(window, kAXPositionAttribute as CFString),
+          let size = axSizeValue(window, kAXSizeAttribute as CFString),
+          size.width > 0,
+          size.height > 0 else {
+        return nil
+    }
+    return CGRect(origin: origin, size: size)
+}
+
+func focusedWindowTitle(bundleID: String) -> String {
+    guard let window = focusedWindowElement(bundleID: bundleID) else {
+        return ""
+    }
+    return axStringAttribute(window, kAXTitleAttribute as CFString)
+        ?? axStringAttribute(window, kAXDescriptionAttribute as CFString)
+        ?? ""
+}
+
+func thumbnailBase64(bundleID: String, maxSide: CGFloat) -> ThumbnailSnapshot {
+    guard let bounds = focusedWindowBounds(bundleID: bundleID) else {
+        return ThumbnailSnapshot(
+            success: false,
+            image_base64: "",
+            mime_type: "image/png",
+            width: 0,
+            height: 0,
+            captured_at: Date().timeIntervalSince1970,
+            window_title: focusedWindowTitle(bundleID: bundleID),
+            error: "Could not determine Codex window bounds."
+        )
+    }
+
+    let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(
+        "icodex-preview-\(UUID().uuidString).png"
+    )
+    let rectArg = "\(Int(bounds.origin.x.rounded())),\(Int(bounds.origin.y.rounded())),\(Int(bounds.size.width.rounded())),\(Int(bounds.size.height.rounded()))"
+
+    let capture = Process()
+    capture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+    capture.arguments = ["-x", "-R", rectArg, tempURL.path]
+    do {
+        try capture.run()
+        capture.waitUntilExit()
+    } catch {
+        return ThumbnailSnapshot(
+            success: false,
+            image_base64: "",
+            mime_type: "image/png",
+            width: 0,
+            height: 0,
+            captured_at: Date().timeIntervalSince1970,
+            window_title: focusedWindowTitle(bundleID: bundleID),
+            error: "Could not capture Codex window image."
+        )
+    }
+
+    guard capture.terminationStatus == 0,
+          let capturedData = try? Data(contentsOf: tempURL) else {
+        try? FileManager.default.removeItem(at: tempURL)
+        return ThumbnailSnapshot(
+            success: false,
+            image_base64: "",
+            mime_type: "image/png",
+            width: 0,
+            height: 0,
+            captured_at: Date().timeIntervalSince1970,
+            window_title: focusedWindowTitle(bundleID: bundleID),
+            error: "Could not capture Codex window image."
+        )
+    }
+    guard let sourceImage = NSImage(data: capturedData) else {
+        try? FileManager.default.removeItem(at: tempURL)
+        return ThumbnailSnapshot(
+            success: false,
+            image_base64: "",
+            mime_type: "image/png",
+            width: 0,
+            height: 0,
+            captured_at: Date().timeIntervalSince1970,
+            window_title: focusedWindowTitle(bundleID: bundleID),
+            error: "Could not decode Codex window image."
+        )
+    }
+    let largestDimension = max(bounds.width, bounds.height)
+    let scale = min(1.0, maxSide / max(1, largestDimension))
+    let targetSize = NSSize(width: max(1, bounds.width * scale), height: max(1, bounds.height * scale))
+
+    let rendered = NSImage(size: targetSize)
+    rendered.lockFocus()
+    sourceImage.draw(in: CGRect(origin: .zero, size: targetSize), from: CGRect(origin: .zero, size: bounds.size), operation: .copy, fraction: 1.0)
+    rendered.unlockFocus()
+
+    guard let tiff = rendered.tiffRepresentation,
+          let bitmap = NSBitmapImageRep(data: tiff),
+          let png = bitmap.representation(using: .png, properties: [:]) else {
+        try? FileManager.default.removeItem(at: tempURL)
+        return ThumbnailSnapshot(
+            success: false,
+            image_base64: "",
+            mime_type: "image/png",
+            width: 0,
+            height: 0,
+            captured_at: Date().timeIntervalSince1970,
+            window_title: focusedWindowTitle(bundleID: bundleID),
+            error: "Could not encode Codex thumbnail."
+        )
+    }
+
+    try? FileManager.default.removeItem(at: tempURL)
+    return ThumbnailSnapshot(
+        success: true,
+        image_base64: png.base64EncodedString(),
+        mime_type: "image/png",
+        width: Int(targetSize.width.rounded()),
+        height: Int(targetSize.height.rounded()),
+        captured_at: Date().timeIntervalSince1970,
+        window_title: focusedWindowTitle(bundleID: bundleID),
+        error: nil
+    )
 }
 
 func openAccessibilitySettings() {
@@ -1028,9 +1198,13 @@ final class NativeMenuBarController: NSObject, NSApplicationDelegate, NSMenuDele
             : "Pairing is ready. Enable Accessibility below to unlock remote control."
         host.stringValue = "Mac: \(status.local_ip):\(status.port)"
         passcode.stringValue = "Passcode: \(status.passcode)"
+        let versionLine = "iCodex-Connect \(status.app_version)"
+        let updateLine = status.requires_update
+            ? "Update available · \(status.update_message)"
+            : "Up to date · \(status.update_message)"
         hint.stringValue = accessibilityGranted
-            ? "Tip: Camera scan jumps straight into iCodex."
-            : "Step 1: click Accessibility in this menu. Pairing still works without it."
+            ? "\(versionLine) · \(updateLine) · Camera scan jumps straight into iCodex."
+            : "\(versionLine) · \(updateLine) · Step 1: click Accessibility in this menu."
     }
 
     private func rebuildDevicesMenu(with devices: [InternalDeviceSnapshot]) {
@@ -1095,6 +1269,7 @@ final class NativeMenuBarController: NSObject, NSApplicationDelegate, NSMenuDele
         accessibilityItem.title = granted
             ? "Accessibility: Granted"
             : "Accessibility: Required for remote control (click to fix)"
+        updateItem.title = status?.requires_update == true ? "Update iCodex-Connect" : "Download Latest Build"
 
         updateTooltip(running: running, devicesCount: devices.count)
         updateQRPreview(with: status)
@@ -1239,6 +1414,14 @@ case "activate":
 
 case "session_state":
     printJSON(sessionStateSnapshot())
+
+case "thumbnail":
+    guard args.count >= 3 else {
+        fputs("usage: icodex_keystroke thumbnail <bundle_id> [max_side]\n", stderr)
+        exit(1)
+    }
+    let maxSide = args.count >= 4 ? CGFloat(Double(args[3]) ?? 320) : 320
+    printJSON(thumbnailBase64(bundleID: args[2], maxSide: maxSide))
 
 case "list_controls":
     guard args.count >= 3 else {
